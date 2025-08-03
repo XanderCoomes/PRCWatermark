@@ -1,20 +1,21 @@
-#Code & Inspo from Xuandong Zhao & Sam Gunn's work
 import numpy as np
 class ZeroBitPRC(): 
     def __init__(self, codeword_len: int):
         self.codeword_len = codeword_len
-        self.sparsity = int(math.log(codeword_len, 2))
-        self.secret_len = int(math.pow(math.log(codeword_len, 2), 2)) 
-        print(type(self.sparsity), type(self.secret_len))
+        self.sparsity = int(np.log2(codeword_len))
+        self.secret_len = self.sparsity ** 2
+        self.num_parity_checks = int(0.99 * codeword_len)
     def GenKey(self): 
         pass
     def Encode(self):
         pass
     def Decode(self): 
         pass
+    def print_info(self): 
+        print("codeword_len:", self.codeword_len,"sparsity:", self.sparsity,"secret_len:", self.secret_len,"num_parity_checks:", self.num_parity_checks)    
 
 
-ZeroBitPRC = ZeroBitPRC(1024)
+
 
     
 
