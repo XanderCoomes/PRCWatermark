@@ -3,5 +3,4 @@ Watermarking the outputs of Generative AI LLMs and Stable Diffusion Image Genera
 
 
 # References
-
-https://github.com/XuandongZhao/PRC-Watermark
+[PRC-Watermark for Image Models](https://github.com/XuandongZhao/PRC-Watermark)
