@@ -1,3 +1,4 @@
+#Note, code is borrowed & inspired by Xuandong Zhao and Sam Gunn's work on PRCs, their github is linked in references
 import numpy as np
 import galois
 from scipy.sparse import csr_matrix
@@ -28,12 +29,13 @@ class ZeroBitPRC():
             #Add dependencies into the generator matrix
             generator_matrix[self.codeword_len - self.num_parity_checks + row] = generator_matrix[chosen_indices[:-1]].sum (axis=0)
         parity_check_matrix = GF(csr_matrix((data, (row_indices, col_indices))).toarray() % 2)
-        return generator_matrix, parity_check_matrix
+        one_time_pad = GF.Random(self.codeword_len)
+        return generator_matrix, parity_check_matrix, one_time_pad
     
-    def Encode(self, generator_matrix):
+    def Encode(self, key):
         secret = GF.Random(self.secret_len)
         error = GF(np.random.binomial(1, self.noise_rate, self.codeword_len))
-        codeword = (generator_matrix @ secret + error) % 2
+        codeword = (generator_matrix @ secret @  + error) % 2
     def Decode(self, parity_check_matrix, codeword): 
         pass
     def print_field_info(self): 
