@@ -11,6 +11,7 @@ class ZeroBitPRC():
         self.secret_len = self.sparsity ** 2
         self.num_parity_checks = int(0.99 * codeword_len)
         self.noise_rate = noise_rate
+    
     def KeyGen(self):
         generator_matrix = GF.Random((self.codeword_len, self.secret_len))
         row_indices = []
@@ -24,10 +25,11 @@ class ZeroBitPRC():
             row_indices.extend([row] * self.sparsity)
             col_indices.extend(chosen_indices)
             data.extend([1] * self.sparsity)
-            # Bake in dependencies into the generator matrix
+            #Add dependencies into the generator matrix
             generator_matrix[self.codeword_len - self.num_parity_checks + row] = generator_matrix[chosen_indices[:-1]].sum (axis=0)
         parity_check_matrix = GF(csr_matrix((data, (row_indices, col_indices))).toarray() % 2)
         return generator_matrix, parity_check_matrix
+    
     def Encode(self, generator_matrix):
         secret = GF.Random(self.secret_len)
         error = GF(np.random.binomial(1, self.noise_rate, self.codeword_len))
