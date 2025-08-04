@@ -1,7 +1,8 @@
 #Note, code is borrowed & inspired by Xuandong Zhao and Sam Gunn's work on PRCs, their github is linked in references
 import numpy as np
 import galois
-from scipy.linalg import null_space
+from scipy.sparse import csr_matrix
+
 
 GF = galois.GF(2)
 
@@ -13,11 +14,18 @@ class ZeroBitPRC():
         self.num_parity_checks = int(0.99 * codeword_len)
         self.noise_rate = noise_rate
     
-    
-    def KeyGen2(self): 
-        parity_check_matrix = GF.Random((self.num_parity_checks, self.codeword_len))
+    def KeyGen(self):
+        parity_check_matrix = np.zeros((self.num_parity_checks, self.codeword_len), dtype = int)
+        for i in range (self.num_parity_checks):
+            row = np.zeros(self.codeword_len, dtype=int)
+            ones_indices = np.random.choice(self.codeword_len, size = self.sparsity, replace = False)
+            row[ones_indices] = 1
+            parity_check_matrix[i] = row 
+
+        parity_check_matrix = GF(parity_check_matrix)
         null_space = parity_check_matrix.null_space()
         null_space = null_space.T 
+        
         generator_matrix = np.zeros((self.codeword_len, self.secret_len), dtype = int)
         for i in range (self.secret_len): 
             rand_null_vector = null_space @ GF.Random(null_space.shape[1])
@@ -25,10 +33,9 @@ class ZeroBitPRC():
         
         generator_matrix = GF(generator_matrix)
         one_time_pad = GF.Random(self.codeword_len)
-
+        
         return generator_matrix, parity_check_matrix, one_time_pad
-
-    
+        
     def Encode(self, encoding_key):
         generator_matrix, one_time_pad = encoding_key
         secret = GF.Random(self.secret_len)
@@ -38,7 +45,7 @@ class ZeroBitPRC():
     
     def Decode(self, decoding_key, codeword): 
         parity_check_matrix, one_time_pad = decoding_key
-        codeword = codeword - one_time_pad
+        codeword = codeword + one_time_pad
         threshold = (1/2 - self.num_parity_checks ** (-0.25)) * self.num_parity_checks
         syndrome = parity_check_matrix @ codeword
         failed_parity_checks = np.sum(syndrome == 1)
