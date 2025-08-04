@@ -32,7 +32,8 @@ class ZeroBitPRC():
         one_time_pad = GF.Random(self.codeword_len)
         return generator_matrix, parity_check_matrix, one_time_pad
     
-    def Encode(self, key):
+    def Encode(self, encoding_key):
+        generator_matrix, one_time_pad = encoding_key
         secret = GF.Random(self.secret_len)
         error = GF(np.random.binomial(1, self.noise_rate, self.codeword_len))
         codeword = (generator_matrix @ secret @  + error) % 2
