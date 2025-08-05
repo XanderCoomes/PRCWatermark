@@ -1,3 +1,4 @@
 galois==0.4.1
 numpy==1.26.0
 scipy
+pytest
