@@ -1,4 +1,3 @@
-#Note, parts of code is borrowed & inspired by Xuandong Zhao and Sam Gunn's work on PRCs, their github is linked in references
 import numpy as np
 import galois
 
