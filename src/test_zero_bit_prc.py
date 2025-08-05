@@ -35,8 +35,6 @@ def empirical_false_positive_rate(codeword_len = n, num_trials = 1000):
     false_positive_rate =  (false_positive_count / num_trials)
     print(false_positive_rate)
     
-
-
 #Helper Methods
 
 def fetch_keys(codeword_len: int):
