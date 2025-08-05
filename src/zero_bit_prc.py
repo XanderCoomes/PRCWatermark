@@ -4,14 +4,18 @@ import galois
 GF = galois.GF(2)
 
 class ZeroBitPRC(): 
-    def __init__(self, codeword_len: int):
+    def __init__(self, codeword_len, sparsity = None):
         self.codeword_len = codeword_len
-        self.sparsity = int(np.log2(codeword_len))
-        self.secret_len = self.sparsity ** 2
+        if(sparsity is None):
+            self.sparsity = int(np.log2(codeword_len))
+        else: 
+            self.sparsity = sparsity
+        self.secret_len = int(np.log2(codeword_len)) ** 2
         self.num_parity_checks = int(0.99 * codeword_len)
 
     def KeyGen(self):
         parity_check_matrix = np.zeros((self.num_parity_checks, self.codeword_len), dtype = int)
+
         for i in range (self.num_parity_checks):
             row = np.zeros(self.codeword_len, dtype=int)
             ones_indices = np.random.choice(self.codeword_len, size = self.sparsity, replace = False)
@@ -19,6 +23,7 @@ class ZeroBitPRC():
             parity_check_matrix[i] = row 
 
         parity_check_matrix = GF(parity_check_matrix)
+        print(parity_check_matrix)
         null_space = parity_check_matrix.null_space()
         null_space = null_space.T 
 
@@ -32,11 +37,10 @@ class ZeroBitPRC():
         
         return generator_matrix, parity_check_matrix, one_time_pad
         
-    def Encode(self, encoding_key, noise_rate: float):
+    def Encode(self, encoding_key, noise_rate):
         generator_matrix, one_time_pad = encoding_key
         secret = GF.Random(self.secret_len)
         error = GF(np.random.binomial(1, noise_rate, self.codeword_len))
-        print(np.sum(error == 1), "errors in codeword")
         codeword = (generator_matrix @ secret + one_time_pad + error)
         return codeword
     
@@ -46,7 +50,6 @@ class ZeroBitPRC():
         threshold = (1/2 - self.num_parity_checks ** (-0.25)) * self.num_parity_checks
         syndrome = parity_check_matrix @ codeword
         failed_parity_checks = np.sum(syndrome == 1)
-        print("threshold:", round(threshold, 1) , "failed parity checks:", failed_parity_checks)
         return failed_parity_checks < threshold    
 
     def print_parameter_info(self): 

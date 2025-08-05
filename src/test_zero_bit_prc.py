@@ -9,35 +9,42 @@ GF = galois.GF(2)
 #Testing Parameters
 noise_levels = np.linspace(0, 0.09, 10)
 noise_levels = noise_levels.round(2)
-n = 2 ** 9
+
+# For undetectability, n ^ t should be greater than 2 ** 100
+n = 2 ** 10
+t = None
+
+def test_setup(): 
+    clear_key(n)
+    return
 
 
 @pytest .mark.parametrize("noise", noise_levels)
-def test_encode_with_noise(noise: float, codeword_len: int = n): 
+def test_encode_with_noise(noise, codeword_len = n, sparsity = t): 
     PRC = ZeroBitPRC(codeword_len)
-    generator_matrix, parity_check_matrix, one_time_pad = fetch_keys(codeword_len)
+    generator_matrix, parity_check_matrix, one_time_pad = fetch_key(codeword_len, sparsity)
     encoding_key = generator_matrix, one_time_pad
     decoding_key = parity_check_matrix, one_time_pad
     codeword = PRC.Encode(encoding_key, noise)
-    watermarked = PRC.Decode(decoding_key, codeword)
-    assert (watermarked == True), "Parity checks exceeded threshold"
+    is_detected = PRC.Decode(decoding_key, codeword)
+    assert (is_detected == True), "PRC codeword not detected"
 
-def empirical_false_positive_rate(codeword_len = n, num_trials = 1000): 
-    PRC = ZeroBitPRC(codeword_len, 0)
-    generator_matrix, parity_check_matrix, one_time_pad = PRC.KeyGen()
+def test_fpr(codeword_len = n, num_trials = 1000): 
+    PRC = ZeroBitPRC(codeword_len)
+    generator_matrix, parity_check_matrix, one_time_pad = fetch_key(codeword_len)
     decoding_key = parity_check_matrix, one_time_pad
     false_positive_count = 0
-    for _ in range(num_trials):
-        random_codeword = GF.random(codeword_len)
-        watermarked = PRC.Decode(decoding_key, random_codeword)
-        if not watermarked:
+    for trial in range(num_trials):
+        random_bits = GF.Random(codeword_len)
+        is_detected = PRC.Decode(decoding_key, random_bits)
+        if is_detected:
             false_positive_count += 1
     false_positive_rate =  (false_positive_count / num_trials)
-    print(false_positive_rate)
-    
+    assert(false_positive_rate < 0.01), "False positive rate exceeded threshold"
+
 #Helper Methods
 
-def fetch_keys(codeword_len: int):
+def fetch_key(codeword_len, sparsity = None):
     save_dir = "keys" 
     os.makedirs(save_dir, exist_ok = True)
     filename = os.path.join(save_dir, f"keys_n{codeword_len}.npz")
@@ -50,7 +57,7 @@ def fetch_keys(codeword_len: int):
         otp = data["one_time_pad"]
     else:
         print(f"[!] No keys found for n={codeword_len}, generating new ones...")
-        PRC = ZeroBitPRC(codeword_len)
+        PRC = ZeroBitPRC(codeword_len, sparsity)
         g, p, otp = PRC.KeyGen()
         np.savez(filename,
                  generator_matrix=g,
@@ -59,3 +66,26 @@ def fetch_keys(codeword_len: int):
         print(f"[+] Saved new keys to {filename}")
     
     return GF(g), GF(p), GF(otp)
+
+def clear_key(codeword_len): 
+    save_dir = "keys"
+    filename = os.path.join(save_dir, f"keys_n{codeword_len}.npz")
+    if os.path.exists(filename):
+        os.remove(filename)
+        print(f"[+] Cleared keys for n={codeword_len}")
+    else:
+        print(f"[!] No keys found for n={codeword_len} to clear")
+
+
+def clear_keys(): 
+    save_dir = "keys"
+    if os.path.exists(save_dir):
+        for filename in os.listdir(save_dir):
+            file_path = os.path.join(save_dir, filename)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+                print(f"[+] Cleared {file_path}")
+    else:
+        print("[!] No keys directory found to clear")
+
+
