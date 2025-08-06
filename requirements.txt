@@ -1,5 +1,5 @@
-galois==0.4.1
-numpy==1.26.0
+galois
+numpy
 scipy
 pytest
 transformers
