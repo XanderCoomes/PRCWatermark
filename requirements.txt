@@ -1,6 +1,15 @@
-galois
+#Generic
 numpy
 scipy
+
+#Galois Fields
+galois
+
+#Testing
 pytest
+
+#ML
 transformers
 torch
+accelerate 
+sentencepiece

@@ -10,33 +10,30 @@ GF = galois.GF(2)
 noise_levels = np.linspace(0, 0.09, 10)
 noise_levels = noise_levels.round(2)
 
+
+#Setup the ZeroBitPRC instance
+@pytest.fixture
+def prc(codeword_len = 2 ** 11): 
+    return ZeroBitPRC(codeword_len)
+
+
 # For undetectability, n ^ t should be greater than 2 ** 100
-n = 2 ** 10
-t = None
-
-def test_setup(): 
-    clear_key(n)
-    return
-
-
-@pytest .mark.parametrize("noise", noise_levels)
-def test_encode_with_noise(noise, codeword_len = n, sparsity = t): 
-    PRC = ZeroBitPRC(codeword_len)
-    generator_matrix, parity_check_matrix, one_time_pad = fetch_key(codeword_len, sparsity)
+@pytest.mark.parametrize("noise", noise_levels)
+def test_encode_with_noise(prc, noise, sparsity = None): 
+    generator_matrix, parity_check_matrix, one_time_pad = fetch_key(prc.codeword_len, sparsity)
     encoding_key = generator_matrix, one_time_pad
     decoding_key = parity_check_matrix, one_time_pad
-    codeword = PRC.Encode(encoding_key, noise)
-    is_detected = PRC.Decode(decoding_key, codeword)
+    codeword = prc.Encode(encoding_key, noise)
+    is_detected = prc.Decode(decoding_key, codeword)
     assert (is_detected == True), "PRC codeword not detected"
 
-def test_fpr(codeword_len = n, num_trials = 1000): 
-    PRC = ZeroBitPRC(codeword_len)
-    generator_matrix, parity_check_matrix, one_time_pad = fetch_key(codeword_len)
+def test_fpr(prc, num_trials = 1000): 
+    generator_matrix, parity_check_matrix, one_time_pad = fetch_key(prc.codeword_len)
     decoding_key = parity_check_matrix, one_time_pad
     false_positive_count = 0
     for trial in range(num_trials):
-        random_bits = GF.Random(codeword_len)
-        is_detected = PRC.Decode(decoding_key, random_bits)
+        random_bits = GF.Random(prc.codeword_len)
+        is_detected = prc.Decode(decoding_key, random_bits)
         if is_detected:
             false_positive_count += 1
     false_positive_rate =  (false_positive_count / num_trials)
@@ -77,7 +74,7 @@ def clear_key(codeword_len):
         print(f"[!] No keys found for n={codeword_len} to clear")
 
 
-def clear_keys(): 
+def clear_all_keys(): 
     save_dir = "keys"
     if os.path.exists(save_dir):
         for filename in os.listdir(save_dir):
