@@ -6,7 +6,6 @@ text = "Generate a Poem on Dragons."
 encoded_input = tokenizer(text, return_tensors='pt')
 output = model(**encoded_input)
 
-
 print(output) 
 
 
