@@ -3,7 +3,16 @@ class LLM:
         self.tokenizer = tokenizer
         self.model = model
         self.model.eval()
+        self.hash = self.simple_hash
+
+        # Generation parameters
+        self.do_sample = True
+        self.temperature = 0.85
+        self.top_p = 0.9
+        self.repetition_penalty = 1.15
+        self.no_repeat_ngram_size = 3
         return 
+
     def simple_hash(token_id): 
         if(token_id % 2 == 0): 
             return 0
@@ -18,11 +27,11 @@ class LLM:
         output = self.model.generate(
             **input_ids,
             max_new_tokens = max_tokens,
-            do_sample = True,
-            temperature = 0.85,
-            top_p = 0.9,
-            repetition_penalty = 1.15,
-            no_repeat_ngram_size = 3,
+            do_sample = self.do_sample,
+            temperature = self.temperature,
+            top_p = self.tokenizer,
+            repetition_penalty = self.repetition_penalty,
+            no_repeat_ngram_size = self.no_repeat_ngram_size,
             eos_token_id = self.tokenizer.eos_token_id
         )
         decoded = self.tokenizer.decode(output[0], skip_special_tokens = True)
