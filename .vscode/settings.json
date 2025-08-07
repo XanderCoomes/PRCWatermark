@@ -1,6 +1,0 @@
-{
-    "workbench.colorCustomizations": {
-        "editor.selectionBackground": "#0080ff85", // Highlight color (gold in this example)
-        "editor.selectionForeground": "#000000"  // Text color within the selection (black in this example)
-    }
-}
