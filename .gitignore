@@ -1,7 +1,5 @@
 # Build artifacts
 *.egg-info/
-build/
-dist/
 
 # Bytecode
 __pycache__/
