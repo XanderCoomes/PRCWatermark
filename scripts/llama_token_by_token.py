@@ -28,7 +28,7 @@ input_ids = tokenizer(prompt, return_tensors="pt").to(model.device)
 generated_ids = input_ids["input_ids"]
 
 # Sampling config
-max_new_tokens = 900
+max_new_tokens = 100
 temperature = 0.85
 top_p = 0.9
 repetition_penalty = 1.15
@@ -63,7 +63,7 @@ for _ in range(max_new_tokens):
     logits = logits / temperature
 
     # Top-p sampling
-    probs = F.softmax(logits, dim=-1)
+    probs = F.softmax(logits, dim=-1) 
     sorted_probs, sorted_indices = torch.sort(probs, descending=True)
     cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
     sorted_indices_to_remove = cumulative_probs > top_p
@@ -90,3 +90,5 @@ for _ in range(max_new_tokens):
     # Stop if EOS
     if next_token.item() == tokenizer.eos_token_id:
         break
+
+print(decoded_so_far)
