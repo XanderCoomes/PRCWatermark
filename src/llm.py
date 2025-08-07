@@ -13,6 +13,7 @@ class LLM:
         self.no_repeat_ngram_size = 3
         return 
 
+    @staticmethod
     def simple_hash(token_id): 
         if(token_id % 2 == 0): 
             return 0
@@ -29,17 +30,14 @@ class LLM:
             max_new_tokens = max_tokens,
             do_sample = self.do_sample,
             temperature = self.temperature,
-            top_p = self.tokenizer,
+            top_p = self.top_p,
             repetition_penalty = self.repetition_penalty,
             no_repeat_ngram_size = self.no_repeat_ngram_size,
             eos_token_id = self.tokenizer.eos_token_id
         )
-        decoded = self.tokenizer.decode(output[0], skip_special_tokens = True)
-
-        if prompt.strip() in decoded:
-            response = decoded.split(prompt.strip())[-1].strip()
-        else:
-            response = decoded.strip()
+        input_len = input_ids["input_ids"].shape[1]
+        generated_text = output[0][input_len:]  # slice only new tokens
+        response = self.tokenizer.decode(generated_text, skip_special_tokens=True).strip()
 
         return response
     def gen_watermarked_response(self, prompt, max_tokens, encoding_key): 

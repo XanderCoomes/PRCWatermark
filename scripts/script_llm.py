@@ -6,11 +6,11 @@ prompt =  """
 You are a knowledgeable and articulate academic assistant.
 
 <|user|>
-Write a short poem on the impact of artificial intelligence on the future of education. Discuss opportunities, risks, and give examples.
-
-<|assistant|>
+Write a poem about natural beauty of the frog. 
+<|assistant|> 
 """
-short_poem = LLama.gen_response(prompt, max_tokens = 30)
+short_poem = LLama.gen_response(prompt, max_tokens = 50)
+
 print(short_poem)
 
 
