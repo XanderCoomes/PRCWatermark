@@ -13,3 +13,6 @@ transformers
 torch
 accelerate 
 sentencepiece
+
+#Setup Package
+-e .

@@ -1,4 +1,14 @@
-venv/
+# Build artifacts
+*.egg-info/
+build/
+dist/
 
+# Bytecode
 __pycache__/
 *.py[cod]
+
+# Virtual environments
+venv/
+
+# Misc
+*.log
