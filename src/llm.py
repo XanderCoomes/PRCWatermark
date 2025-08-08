@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from zero_bit_prc import ZeroBitPRC
+from key_manager import fetch_key, gen_key
 import galois
 
 GF = galois.GF(2)
@@ -15,7 +16,7 @@ class LLM:
 
         # Generation parameters
         self.do_sample = True
-        self.temperature = 0.8
+        self.temperature = 1.5
         self.top_p = 0.9
         self.repetition_penalty = 1.2
         self.no_repeat_ngram_size = 3
@@ -28,15 +29,16 @@ class LLM:
             return 0
         else: 
             return 1
-
-    def fetch_keys(self, num_tokens): 
-        return np.ones(num_tokens, dtype = int)
     
     def gen_codeword(self, num_tokens): 
-        keys = self.fetch_keys(num_tokens)
-        codeword = np.ones(num_tokens, dtype = int)
+        PRC = ZeroBitPRC(codeword_len = num_tokens)
+        if(fetch_key(PRC.codeword_len) is None):
+            gen_key(PRC.codeword_len, sparsity = 1)
+        generator_matrix, parity_check_matrix, one_time_pad = fetch_key(PRC.codeword_len)
+        encoding_key = (generator_matrix, one_time_pad)
+        decoding_key = (parity_check_matrix, one_time_pad)
+        codeword = PRC.encode(encoding_key, noise_rate = 0.00)
         return codeword
-    
     
     def gen_response(self, prompt, num_tokens, is_watermarked):
         codeword = np.zeros(num_tokens, dtype = int)
@@ -151,7 +153,6 @@ class LLM:
         response = self.tokenizer.decode(generated_ids[0][input_len:], skip_special_tokens=True).strip()
 
         return response
-            
 
     def response_to_token_ids(self, response): 
         if response is None or len(response.strip()) == 0:
@@ -165,12 +166,16 @@ class LLM:
         for token in token_ids:
             noisy_codeword = np.append(noisy_codeword, self.hash(token))
 
-        keys = self.fetch_keys(len(noisy_codeword))
-        keys = GF(keys)
-        noisy_codeword = GF(noisy_codeword)
-
-        syndrome = keys + noisy_codeword
-        if(np.sum(syndrome == 1) < 0.4 * len(noisy_codeword)):
-            return True
+        if(fetch_key(len(noisy_codeword)) is not None):
+            generator_matrix, parity_check_matrix, one_time_pad = fetch_key(len(noisy_codeword))
+        elif(fetch_key(len(noisy_codeword) - 1) is not None): 
+            generator_matrix, parity_check_matrix, one_time_pad = fetch_key(len(noisy_codeword) - 1)
+            noisy_codeword = noisy_codeword[:-1]
         else: 
             return False
+
+        decoding_key = (parity_check_matrix, one_time_pad)
+        PRC = ZeroBitPRC(codeword_len = len(noisy_codeword))
+        is_watermarked = PRC.decode(decoding_key, GF(noisy_codeword))
+        return is_watermarked
+    

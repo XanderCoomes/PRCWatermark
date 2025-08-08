@@ -1,6 +1,7 @@
 from llama import Llama
 import galois
 import numpy as np
+from key_manager import fetch_key, clear_key, clear_all_keys
 
 GF = galois.GF(2)
 
@@ -14,7 +15,7 @@ Write a poem about a hummingbird.
 
 <|assistant|> 
 """
-num_tokens = 20
+num_tokens = 2 ** 6
 is_watermarked = True
 
 if(is_watermarked): 
@@ -31,5 +32,4 @@ if(LLama.detect_watermarked_response(response) == True):
     print("Watermarked response detected.")
 else: 
     print("No watermark detected.")
-
 

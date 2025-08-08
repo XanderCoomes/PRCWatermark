@@ -13,7 +13,7 @@ class ZeroBitPRC():
         self.secret_len = int(np.log2(codeword_len)) ** 2
         self.num_parity_checks = int(0.99 * codeword_len)
 
-    def KeyGen(self):
+    def key_gen(self):
         # Generate a random sparse parity check matrix, P
         parity_check_matrix = np.zeros((self.num_parity_checks, self.codeword_len), dtype = int)
 
@@ -38,7 +38,7 @@ class ZeroBitPRC():
         
         return generator_matrix, parity_check_matrix, one_time_pad
         
-    def Encode(self, encoding_key, noise_rate):
+    def encode(self, encoding_key, noise_rate):
         generator_matrix, one_time_pad = encoding_key
         # Generate a random secret
         secret = GF.Random(self.secret_len)
@@ -49,7 +49,7 @@ class ZeroBitPRC():
         codeword = (generator_matrix @ secret + one_time_pad + error)
         return codeword
     
-    def Decode(self, decoding_key, codeword): 
+    def decode(self, decoding_key, codeword): 
         parity_check_matrix, one_time_pad = decoding_key
         codeword = codeword + one_time_pad
 
@@ -65,6 +65,8 @@ class ZeroBitPRC():
         print("sparsity:", self.sparsity)
         print("secret_len:", self.secret_len)
         print("num_parity_checks:", self.num_parity_checks)
+
+    
 
 
 
