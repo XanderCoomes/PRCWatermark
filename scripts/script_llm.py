@@ -3,6 +3,8 @@ import galois
 import numpy as np
 from key_manager import fetch_key, clear_key, clear_all_keys
 
+
+
 GF = galois.GF(2)
 
 LLama = Llama()
