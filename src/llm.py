@@ -1,6 +1,10 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
+from zero_bit_prc import ZeroBitPRC
+import galois
+
+GF = galois.GF(2)
 
 class LLM: 
     def __init__(self, tokenizer, model): 
@@ -11,10 +15,11 @@ class LLM:
 
         # Generation parameters
         self.do_sample = True
-        self.temperature = 0.85
+        self.temperature = 0.8
         self.top_p = 0.9
-        self.repetition_penalty = 1.15
+        self.repetition_penalty = 1.2
         self.no_repeat_ngram_size = 3
+        
         return 
 
     @staticmethod
@@ -23,129 +28,125 @@ class LLM:
             return 0
         else: 
             return 1
-        
-    def print_vocab_info(self): 
-        vocab_dict = self.tokenizer.get_vocab()
-        index_to_token = {idx: token for token, idx in vocab_dict.items()}
-        sorted_tokens = sorted(index_to_token.items()) 
-        print("\nVocabulary size:", len(vocab_dict))
-        print("Select tokens in the Vocabulary")
-        print("Index\tToken")
-        for idx, token in sorted_tokens[1000:1100]:
-            print(f"{idx}\t{token}")
-        
-        return
-       
-    def gen_response(self, prompt, max_tokens): 
-        input_ids = self.tokenizer(prompt.strip(), return_tensors="pt").to(self.model.device)
-        output = self.model.generate(
-            **input_ids,
-            max_new_tokens = max_tokens,
-            do_sample = self.do_sample,
-            temperature = self.temperature,
-            top_p = self.top_p,
-            repetition_penalty = self.repetition_penalty,
-            no_repeat_ngram_size = self.no_repeat_ngram_size,
-            eos_token_id = self.tokenizer.eos_token_id
-        )
-        input_len = input_ids["input_ids"].shape[1]
-        generated_text = output[0][input_len:]  # slice only new tokens
-        response = self.tokenizer.decode(generated_text, skip_special_tokens=True).strip()
 
-        return response
-    def gen_watermarked_response(self, prompt, max_tokens, encoding_key):
-        return
+    def fetch_keys(self, num_tokens): 
+        return np.ones(num_tokens, dtype = int)
     
+    def gen_codeword(self, num_tokens): 
+        keys = self.fetch_keys(num_tokens)
+        codeword = np.ones(num_tokens, dtype = int)
+        return codeword
+    
+    
+    def gen_response(self, prompt, num_tokens, is_watermarked):
+        codeword = np.zeros(num_tokens, dtype = int)
+        if(is_watermarked == True): 
+            codeword = self.gen_codeword(num_tokens)
 
-    def modify_probs(self, probs, codeword_val):
-        # probs: shape (1, vocab_size)
-        vocab_size = probs.shape[-1]
-        device = probs.device
+        response = self.sample_response(prompt, codeword, is_watermarked)
+        return response
 
-        # Vectorize the hash function
-        indices = torch.arange(vocab_size, device=device)
-        hash_vals = torch.tensor([self.hash(i) for i in range(vocab_size)], device=device)
-        
-        # Create masks
-        mask = (hash_vals == codeword_val)  # shape: (vocab_size,)
-        
-        # Apply scaling
-        scale = torch.where(mask, torch.tensor(500.0, device=device), torch.tensor(0.2, device=device))
-        probs = probs * scale  # broadcast over (1, vocab_size)
-        
-        # Normalize
-        probs = probs / probs.sum()
+    def apply_repetition_penalty(self, logits, generated_ids):
+        if self.repetition_penalty != 1.0:
+            for token_id in set(generated_ids[0].tolist()):
+                logits[0, token_id] /= self.repetition_penalty
+        return logits
 
-        return probs
-
-    def gen_watermarked_response(self, prompt, max_tokens, codeword): 
-        input_ids = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
-        generated_ids = input_ids["input_ids"]
-
-        # Sampling config
-        max_new_tokens = max_tokens
-        temperature = self.temperature
-        top_p = self.top_p
-        repetition_penalty = self.repetition_penalty
-        no_repeat_ngram_size = self.no_repeat_ngram_size
-
-        # Initial decoded text
-        decoded_so_far = self.tokenizer.decode(generated_ids[0], skip_special_tokens=True)
-
-        for token_idx in range(max_new_tokens):
-            # Get logits
-            outputs = self.model(input_ids=generated_ids)
-            logits = outputs.logits[:, -1, :]
-
-            # Apply repetition penalty
-            if repetition_penalty != 1.0:
-                for token_id in set(generated_ids[0].tolist()):
-                    logits[0, token_id] /= repetition_penalty
-
-            # No-repeat ngram
-            if no_repeat_ngram_size > 0 and generated_ids.size(1) >= no_repeat_ngram_size:
+    def apply_no_repeat_ngram(self, logits, generated_ids):
+        if self.no_repeat_ngram_size > 0 and generated_ids.size(1) >= self.no_repeat_ngram_size:
                 banned_tokens = []
                 context = generated_ids[0].tolist()
-                prev_ngram = tuple(context[-(no_repeat_ngram_size - 1):])
-                for i in range(len(context) - no_repeat_ngram_size + 1):
-                    ngram = tuple(context[i:i + no_repeat_ngram_size])
+                prev_ngram = tuple(context[-(self.no_repeat_ngram_size - 1):])
+                for i in range(len(context) - self.no_repeat_ngram_size + 1):
+                    ngram = tuple(context[i:i + self.no_repeat_ngram_size])
                     if tuple(ngram[:-1]) == prev_ngram:
                         banned_tokens.append(ngram[-1])
                 for token in banned_tokens:
                     logits[0, token] = -float("inf")
+        return logits
+    
+    def apply_top_p_sampling(self, probs): 
+        sorted_probs, sorted_indices = torch.sort(probs, descending=True)
+        cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
+        sorted_indices_to_remove = cumulative_probs > self.top_p
+        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+        sorted_indices_to_remove[..., 0] = 0
+        indices_to_remove = sorted_indices[sorted_indices_to_remove]
+        probs[0, indices_to_remove] = 0
+        probs = probs / probs.sum()
+        return probs
+    
+    #Bias probabilities towards so that the sampled token's hash matches bit
+    def bias_probs(self, probs, bit):
+        vocab_size = probs.shape[-1]
+        device = probs.device
 
-            # Temperature
-            logits = logits / temperature
+        # Vectorize hash over all indices once
+        token_hash_vals = torch.tensor([self.hash(i) for i in range(vocab_size)], device=device)
 
-            # Top-p sampling
-            probs = F.softmax(logits, dim=-1) 
-            sorted_probs, sorted_indices = torch.sort(probs, descending=True)
-            cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
-            sorted_indices_to_remove = cumulative_probs > top_p
-            sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
-            sorted_indices_to_remove[..., 0] = 0
-            indices_to_remove = sorted_indices[sorted_indices_to_remove]
-            probs[0, indices_to_remove] = 0
-            probs = probs / probs.sum()
+        # Mask where hash == bit
+        bits_to_boost = (token_hash_vals == bit)
+        
+        # Extract total probabilitiy of sampling a token with hash == bit
+        group_probs = probs[0][bits_to_boost]
+        unbiased_bit_prob = group_probs.sum().item()
 
-            probs = self.modify_probs(probs, codeword[token_idx])
+        # Handle edge cases - avoid a divide by zero
+        if unbiased_bit_prob == 0.0 or unbiased_bit_prob == 1.0:
+            return probs
+
+        # Compute biased sum
+        biased_bit_prob = 1.0 if unbiased_bit_prob > 0.5 else 2 * unbiased_bit_prob
+
+        #Boost the probabilities of bits which agree with 'bit' and reduce others
+        biased_probs = probs.clone()
+        biased_probs[0, bits_to_boost] = (probs[0, bits_to_boost] / unbiased_bit_prob) * biased_bit_prob
+        biased_probs[0, ~bits_to_boost] = (probs[0, ~bits_to_boost] / (1 - unbiased_bit_prob)) * (1 - biased_bit_prob)
+
+        # Normalize
+        biased_probs = biased_probs / biased_probs.sum()
+
+        return biased_probs
+    
+    def sample_response(self, prompt, codeword, is_watermarked): 
+        input_ids = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        generated_ids = input_ids["input_ids"]
+
+        # Initial decoded text
+        decoded_so_far = self.tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+        for token_idx in range(len(codeword)):
+            # Get logits
+            outputs = self.model(input_ids=generated_ids)
+            logits = outputs.logits[:, -1, :]
+
+            # Apply sampling strategies
+            logits = self.apply_repetition_penalty(logits, generated_ids)
+            logits = self.apply_no_repeat_ngram(logits, generated_ids)
+            logits = logits / self.temperature
+            probs = F.softmax(logits, dim=-1)
+            probs = self.apply_top_p_sampling(probs)
+
+            # Bias probabilities towards desired bit is we are watermarking
+            desired_bit = codeword[token_idx]
+            if(is_watermarked == True):
+                probs = self.bias_probs(probs, desired_bit)
+
             # Sample token
             next_token = torch.multinomial(probs, num_samples=1)
             generated_ids = torch.cat([generated_ids, next_token], dim=-1)
-
-            # Decode full text so far
-            new_decoded = self.tokenizer.decode(generated_ids[0], skip_special_tokens=True)
-
-            # Find the new part
-            new_piece = new_decoded[len(decoded_so_far):]
-            print(new_piece, end='', flush=True)
-
-            # Update tracker
-            decoded_so_far = new_decoded
+            
+            # Print out newly sampled token
+            full_decoded_text = self.tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+            new_token = full_decoded_text[len(decoded_so_far):]
+            print(new_token, end = '', flush = True)
+            decoded_so_far = full_decoded_text
 
             # Stop if EOS
-            if next_token.item() == self.tokenizer.eos_token_id:
+            if next_token.item() == self.tokenizer.eos_token_id and token_idx >= len(codeword):
                 break
+
+        # Remove prompt from output and return response
         input_len = input_ids["input_ids"].shape[1]
         response = self.tokenizer.decode(generated_ids[0][input_len:], skip_special_tokens=True).strip()
 
@@ -158,17 +159,18 @@ class LLM:
         token_ids = self.tokenizer(response, return_tensors="pt")["input_ids"][0].tolist()
         return token_ids
 
-    def detect_watermarked_response(self, response, decoding_key):
-        token_ids = self.response_to_token_ids(response) 
-        codeword = np.empty(0)
+    def detect_watermarked_response(self, response):
+        token_ids = self.response_to_token_ids(response)
+        noisy_codeword = np.empty(0, dtype = int)
         for token in token_ids:
-            codeword = np.append(codeword, self.hash(token))
-        print(codeword)
-        return
-    
-    def gen_token_logits(self, prompt):
-        return
-    
-    def calc_response_entropy(self, prompt, max_tokens, response): 
-        return
-    
+            noisy_codeword = np.append(noisy_codeword, self.hash(token))
+
+        keys = self.fetch_keys(len(noisy_codeword))
+        keys = GF(keys)
+        noisy_codeword = GF(noisy_codeword)
+
+        syndrome = keys + noisy_codeword
+        if(np.sum(syndrome == 1) < 0.4 * len(noisy_codeword)):
+            return True
+        else: 
+            return False

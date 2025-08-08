@@ -7,8 +7,16 @@ import os
 GF = galois.GF(2)
 
 #Testing Parameters
-noise_levels = np.linspace(0, 0.09, 10)
+noise_levels = np.linspace(0, 0.3, 20)
 noise_levels = noise_levels.round(2)
+
+clear_key = True
+
+def test_setup():
+    if clear_key:
+        clear_all_keys()
+    assert True
+    return
 
 
 #Setup the ZeroBitPRC instance

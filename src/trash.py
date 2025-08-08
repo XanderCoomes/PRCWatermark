@@ -16,3 +16,15 @@
 #         parity_check_matrix = GF(csr_matrix((data, (row_indices, col_indices))).toarray() % 2)
 #         one_time_pad = GF.Random(self.codeword_len)
 #         return generator_matrix, parity_check_matrix, one_time_pad
+
+    # def print_vocab_info(self): 
+    #     vocab_dict = self.tokenizer.get_vocab()
+    #     index_to_token = {idx: token for token, idx in vocab_dict.items()}
+    #     sorted_tokens = sorted(index_to_token.items()) 
+    #     print("\nVocabulary size:", len(vocab_dict))
+    #     print("Select tokens in the Vocabulary")
+    #     print("Index\tToken")
+    #     for idx, token in sorted_tokens[1000:1100]:
+    #         print(f"{idx}\t{token}")
+        
+    #     return

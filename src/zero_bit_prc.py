@@ -14,6 +14,7 @@ class ZeroBitPRC():
         self.num_parity_checks = int(0.99 * codeword_len)
 
     def KeyGen(self):
+        # Generate a random sparse parity check matrix, P
         parity_check_matrix = np.zeros((self.num_parity_checks, self.codeword_len), dtype = int)
 
         for i in range (self.num_parity_checks):
@@ -23,10 +24,10 @@ class ZeroBitPRC():
             parity_check_matrix[i] = row 
 
         parity_check_matrix = GF(parity_check_matrix)
-        print(parity_check_matrix)
         null_space = parity_check_matrix.null_space()
         null_space = null_space.T 
 
+        # Generate a random generator matrix G, such that PG = 0
         generator_matrix = np.zeros((self.codeword_len, self.secret_len), dtype = int)
         for i in range (self.secret_len): 
             rand_null_vector = null_space @ GF.Random(null_space.shape[1])
@@ -39,15 +40,22 @@ class ZeroBitPRC():
         
     def Encode(self, encoding_key, noise_rate):
         generator_matrix, one_time_pad = encoding_key
+        # Generate a random secret
         secret = GF.Random(self.secret_len)
+
+        # Error is added to ensure pseudorandomness
         error = GF(np.random.binomial(1, noise_rate, self.codeword_len))
+
         codeword = (generator_matrix @ secret + one_time_pad + error)
         return codeword
     
     def Decode(self, decoding_key, codeword): 
         parity_check_matrix, one_time_pad = decoding_key
         codeword = codeword + one_time_pad
+
+        # Threshold for detection, can be tunes according to desired False Positive Rate
         threshold = (1/2 - self.num_parity_checks ** (-0.25)) * self.num_parity_checks
+        
         syndrome = parity_check_matrix @ codeword
         failed_parity_checks = np.sum(syndrome == 1)
         return failed_parity_checks < threshold    

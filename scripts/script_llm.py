@@ -1,22 +1,35 @@
 from llama import Llama
+import galois
 import numpy as np
+
+GF = galois.GF(2)
 
 LLama = Llama()
 prompt =  """
 <|system|>
-You are a knowledgeable and articulate academic assistant.
+You are an academic and mindful assistant.
 
 <|user|>
-Write a poem about something interesting. 
+Write a poem about a hummingbird.
+
 <|assistant|> 
 """
-max_tokens = 50
-codeword = np.ones(max_tokens) 
-short_poem = LLama.gen_watermarked_response(prompt, max_tokens, codeword)
- 
+num_tokens = 20
+is_watermarked = True
 
-print("Decoding the Poem:")
-LLama.detect_watermarked_response(short_poem, decoding_key = None)
+if(is_watermarked): 
+    text  = "Watermarked Response:"
+else: 
+    text = "Non-Watermarked Response:"
 
+print(text)
+response = LLama.gen_response(prompt, num_tokens, is_watermarked)
+print("\n")
+
+print("Detection:")
+if(LLama.detect_watermarked_response(response) == True): 
+    print("Watermarked response detected.")
+else: 
+    print("No watermark detected.")
 
 
