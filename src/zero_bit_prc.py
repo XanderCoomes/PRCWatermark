@@ -58,6 +58,8 @@ class ZeroBitPRC():
         
         syndrome = parity_check_matrix @ codeword
         failed_parity_checks = np.sum(syndrome == 1)
+        print("failed checks: ", failed_parity_checks)
+        print("threshold: ", threshold)
         return failed_parity_checks < threshold    
 
     def print_parameter_info(self): 

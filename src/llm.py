@@ -16,7 +16,7 @@ class LLM:
 
         # Generation parameters
         self.do_sample = True
-        self.temperature = 1.5
+        self.temperature = 4.0
         self.top_p = 0.9
         self.repetition_penalty = 1.2
         self.no_repeat_ngram_size = 3
@@ -31,9 +31,10 @@ class LLM:
             return 1
     
     def gen_codeword(self, num_tokens): 
+        SPARSITY = 1
         PRC = ZeroBitPRC(codeword_len = num_tokens)
         if(fetch_key(PRC.codeword_len) is None):
-            gen_key(PRC.codeword_len, sparsity = 1)
+            gen_key(PRC.codeword_len, sparsity = SPARSITY)
         generator_matrix, parity_check_matrix, one_time_pad = fetch_key(PRC.codeword_len)
         encoding_key = (generator_matrix, one_time_pad)
         decoding_key = (parity_check_matrix, one_time_pad)
@@ -46,6 +47,8 @@ class LLM:
             codeword = self.gen_codeword(num_tokens)
 
         response = self.sample_response(prompt, codeword, is_watermarked)
+        print("\n")
+        print("origi_codeword: ", codeword)
         return response
 
     def apply_repetition_penalty(self, logits, generated_ids):
@@ -136,12 +139,16 @@ class LLM:
 
             # Sample token
             next_token = torch.multinomial(probs, num_samples=1)
+            true_bit = self.hash(next_token.item())
             generated_ids = torch.cat([generated_ids, next_token], dim=-1)
             
             # Print out newly sampled token
             full_decoded_text = self.tokenizer.decode(generated_ids[0], skip_special_tokens=True)
             new_token = full_decoded_text[len(decoded_so_far):]
-            print(new_token, end = '', flush = True)
+            if(true_bit == desired_bit): 
+                print(f"\033[30;42m{new_token}\033[0m", end = '', flush = True)
+            else: 
+                print(f"\033[30;41m{new_token}\033[0m", end = '', flush = True)
             decoded_so_far = full_decoded_text
 
             # Stop if EOS
@@ -160,18 +167,18 @@ class LLM:
         token_ids = self.tokenizer(response, return_tensors="pt")["input_ids"][0].tolist()
         return token_ids
 
-    def detect_watermarked_response(self, response):
+    def detect_watermarked_response(self, response, num_tokens):
         token_ids = self.response_to_token_ids(response)
-        noisy_codeword = np.empty(0, dtype = int)
-        for token in token_ids:
+        
+        noisy_codeword = np.array([], dtype=int)
+        for token in token_ids[1 : num_tokens + 1]:
             noisy_codeword = np.append(noisy_codeword, self.hash(token))
-
+        print("noise_codeword: ", noisy_codeword)
+        print(len(token_ids))
         if(fetch_key(len(noisy_codeword)) is not None):
             generator_matrix, parity_check_matrix, one_time_pad = fetch_key(len(noisy_codeword))
-        elif(fetch_key(len(noisy_codeword) - 1) is not None): 
-            generator_matrix, parity_check_matrix, one_time_pad = fetch_key(len(noisy_codeword) - 1)
-            noisy_codeword = noisy_codeword[:-1]
-        else: 
+        else:
+            print(f"[!] No keys found for n = {len(noisy_codeword)}. Cannot detect watermark.")
             return False
 
         decoding_key = (parity_check_matrix, one_time_pad)

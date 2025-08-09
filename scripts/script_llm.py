@@ -13,11 +13,11 @@ prompt =  """
 You are an academic and mindful assistant.
 
 <|user|>
-Write a poem about a hummingbird.
+Write a poem about a mountain.
 
 <|assistant|> 
 """
-num_tokens = 2 ** 6
+num_tokens = 2 ** 5
 is_watermarked = True
 
 if(is_watermarked): 
@@ -29,8 +29,8 @@ print(text)
 response = LLama.gen_response(prompt, num_tokens, is_watermarked)
 print("\n")
 
-print("Detection:")
-if(LLama.detect_watermarked_response(response) == True): 
+# print("Detection:")
+if(LLama.detect_watermarked_response(response, num_tokens) == True): 
     print("Watermarked response detected.")
 else: 
     print("No watermark detected.")

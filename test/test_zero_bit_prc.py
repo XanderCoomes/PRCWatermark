@@ -22,7 +22,7 @@ def test_setup():
 
 #Setup the ZeroBitPRC instance
 @pytest.fixture
-def prc(codeword_len = 2 ** 11): 
+def prc(codeword_len = 2 ** 6): 
     return ZeroBitPRC(codeword_len)
 
 
@@ -31,7 +31,7 @@ def prc(codeword_len = 2 ** 11):
 def test_encode_with_noise(prc, noise, sparsity = None): 
     if(fetch_key(prc.codeword_len) is None):
         gen_key(prc.codeword_len, sparsity)
-    generator_matrix, parity_check_matrix, one_time_pad = fetch_key(prc.codeword_len, sparsity)
+    generator_matrix, parity_check_matrix, one_time_pad = fetch_key(prc.codeword_len)
     encoding_key = generator_matrix, one_time_pad
     decoding_key = parity_check_matrix, one_time_pad
     codeword = prc.encode(encoding_key, noise)
