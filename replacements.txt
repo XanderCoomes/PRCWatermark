@@ -1,1 +1,0 @@
-regex:hf_[A-Za-z0-9_-]{32,}=***REMOVED***
