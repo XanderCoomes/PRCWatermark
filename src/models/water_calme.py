@@ -1,6 +1,6 @@
 
 # Use a pipeline as a high-level helper
-from water_llm import WaterLLM
+from models.water_llm import WaterLLM
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 from transformers import pipeline

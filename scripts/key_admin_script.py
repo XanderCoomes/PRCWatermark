@@ -1,4 +1,4 @@
-from key_admin import KeyAdmin
+from key_management.key_admin import KeyAdmin
 
 key_dir = "keys"
 admin = KeyAdmin(key_dir)

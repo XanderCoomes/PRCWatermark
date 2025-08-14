@@ -1,4 +1,4 @@
-from water_llm import WaterLLM
+from models.water_llm import WaterLLM
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 

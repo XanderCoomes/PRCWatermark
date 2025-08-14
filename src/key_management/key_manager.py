@@ -40,10 +40,10 @@ class KeyManager:
             g = data["generator_matrix"]
             p = data["parity_check_matrix"]
             otp = data["one_time_pad"]
+            return GF(g), GF(p), GF(otp)
         else:
             return None
         
-        return GF(g), GF(p), GF(otp)
     
     def clear_all_keys(self): 
         model_dir = self._model_dir()

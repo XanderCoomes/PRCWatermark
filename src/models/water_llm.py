@@ -1,4 +1,4 @@
-from key_manager import KeyManager
+from key_management.key_manager import KeyManager
 import torch
 import numpy as np
 import torch.nn.functional as F
@@ -54,6 +54,7 @@ class WaterLLM():
         num_tokens = int(num_words * 1.25)
         prompt = self.complete_prompt(prompt)
         codeword = self.__gen_codeword(num_tokens)
+        print("clean_majority_codeword: ", codeword)
         response = self.__sample_response(prompt, codeword, num_tokens, is_watermarked) 
         self.detect_water(response, num_tokens)
         return response
@@ -63,7 +64,10 @@ class WaterLLM():
         noisy_majority_codeword = np.empty(0, dtype = int)
         for tid in token_ids[0 : num_tokens]:
             h = self.simple_hash(tid)
-            noisy_majority_codeword = np.append(noisy_majority_codeword, h)
+            noisy_majority_codeword = np.append(noisy_majority_codeword, h) 
+
+        print("noisy_majority_codeword: ", noisy_majority_codeword)
+
         
         codeword_len = int(num_tokens / self.majority_encoding_rate)
         sparsity = self.sparsity_function(codeword_len)
@@ -71,6 +75,7 @@ class WaterLLM():
         generator_matrix, parity_check_matrix,one_time_pad = self._key_manager.fetch_key(codeword_len, sparsity)
         decoding_key = (parity_check_matrix, one_time_pad)
         noisy_codeword = majority_decode(noisy_majority_codeword, codeword_len)
+        print("noisy_codeword", noisy_codeword)
         print(decode(decoding_key, noisy_codeword))
 
     
@@ -84,6 +89,7 @@ class WaterLLM():
             generator_matrix, parity_check_matrix, one_time_pad = self._key_manager.gen_key(codeword_len, sparsity)
         encoding_key = (generator_matrix, one_time_pad)
         codeword = encode(encoding_key, self.encoding_noise_rate)
+        print("clean_codeword", codeword)
         majority_codeword = majority_encode(codeword, self.majority_encoding_rate)
         return majority_codeword
 

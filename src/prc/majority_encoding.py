@@ -42,7 +42,7 @@ def partition_equal_np(codeword: np.ndarray, n: int):
     chunks = []
     start = 0
     for i in range(n):
-        chunk_size = base_size + (1 if i < remainder else 0)
+        chunk_size = base_size + (1 if i >= n - remainder else 0)
         chunks.append(codeword[start:start + chunk_size])
         start += chunk_size
 

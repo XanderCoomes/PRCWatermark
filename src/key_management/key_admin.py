@@ -1,4 +1,4 @@
-from key_manager import KeyManager
+from key_management.key_manager import KeyManager
 
 class KeyAdmin(): 
     def __init__(self, key_dir):

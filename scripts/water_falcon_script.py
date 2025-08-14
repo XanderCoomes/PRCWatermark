@@ -11,7 +11,7 @@ def constant_sparsity_function(codeword_len):
     return 1
 
 encoding_noise_rate =  0.00
-majority_encoding_rate = 3
+majority_encoding_rate = 6
 key_dir = "keys"
 
 water_config = WaterConfig(sparsity_function, encoding_noise_rate, majority_encoding_rate, key_dir)
@@ -33,7 +33,7 @@ default_falcon = WaterFalcon(model_name, gen_config, water_config)
 
 
 prompt = "Write something about the political state we are in right now"
-num_words = 20
+num_words = 50
 is_watermarked = True
 
 default_falcon.generate(prompt, num_words, is_watermarked)
