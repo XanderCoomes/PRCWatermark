@@ -1,4 +1,4 @@
-from models.water_llama import WaterLlama
+from models.water_deep import WaterDeep
 from configs.water_config import WaterConfig
 from configs.generation_config import GenerationConfig
 import numpy as np
@@ -26,13 +26,13 @@ add_special_tokens = False
 
 gen_config = GenerationConfig(temperature, top_p, repetition_penalty, no_repeat_ngram_size, token_buffer, skip_special_tokens, add_special_tokens)
 
-model_name = "DefaultBigLLama"
+model_name = "DefaultDeepSeek"
 
-default_falcon = WaterLlama(model_name, gen_config, water_config)
+default_deep_seek = WaterDeep(model_name, gen_config, water_config)
 
 
 prompt = "Write the following statement: I am an AI and I will never lie end quote, 5 times"
 num_words = 50
 is_watermarked = True
 
-default_falcon.generate(prompt, num_words, is_watermarked)
+default_deep_seek.generate(prompt, num_words, is_watermarked)

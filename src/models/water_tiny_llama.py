@@ -4,7 +4,7 @@ import torch
 
 class WaterLlama(WaterLLM):
     def __init__(self, model_name, generation_config, water_config):
-        model_id = "meta-llama/Meta-Llama-3-8B"
+        model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
         tokenizer = AutoTokenizer.from_pretrained(model_id)
         model = AutoModelForCausalLM.from_pretrained(
             model_id,
