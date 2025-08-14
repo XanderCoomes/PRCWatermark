@@ -11,28 +11,27 @@ def constant_sparsity_function(codeword_len):
     return 1
 
 encoding_noise_rate =  0.00
-majority_encoding_rate = 6
+majority_encoding_rate = 3
 key_dir = "keys"
 
-water_config = WaterConfig(sparsity_function, encoding_noise_rate, majority_encoding_rate, key_dir)
+water_config = WaterConfig(constant_sparsity_function, encoding_noise_rate, majority_encoding_rate, key_dir)
 
-temperature = 2.5
+temperature = 1.0
 top_p = 0.9
 repetition_penalty = 1.2
 no_repeat_ngram_size = 3
-token_buffer = 5
+token_buffer = 0
 skip_special_tokens = False
 add_special_tokens = False
 
 gen_config = GenerationConfig(temperature, top_p, repetition_penalty, no_repeat_ngram_size, token_buffer, skip_special_tokens, add_special_tokens)
-
 
 model_name = "DefaultFalcon"
 
 default_falcon = WaterFalcon(model_name, gen_config, water_config)
 
 
-prompt = "Write something about the political state we are in right now"
+prompt = "Write the following statement: I am an AI and I will never lie end quote, 5 times"
 num_words = 50
 is_watermarked = True
 

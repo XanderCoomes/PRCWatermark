@@ -4,6 +4,9 @@ import numpy as np
 import torch.nn.functional as F
 from prc.zero_bit_prc import encode, decode
 from prc.majority_encoding import majority_encode, majority_decode
+import galois
+
+GF = galois.GF(2)
 
 
 class WaterLLM(): 
@@ -51,10 +54,9 @@ class WaterLLM():
         else: 
             text = "Dry"
         print(text, " Text: ")
-        num_tokens = int(num_words * 1.25)
+        num_tokens = int(num_words * 1.33)
         prompt = self.complete_prompt(prompt)
         codeword = self.__gen_codeword(num_tokens)
-        print("clean_majority_codeword: ", codeword)
         response = self.__sample_response(prompt, codeword, num_tokens, is_watermarked) 
         self.detect_water(response, num_tokens)
         return response
@@ -65,18 +67,17 @@ class WaterLLM():
         for tid in token_ids[0 : num_tokens]:
             h = self.simple_hash(tid)
             noisy_majority_codeword = np.append(noisy_majority_codeword, h) 
-
-        print("noisy_majority_codeword: ", noisy_majority_codeword)
-
         
         codeword_len = int(num_tokens / self.majority_encoding_rate)
         sparsity = self.sparsity_function(codeword_len)
 
         generator_matrix, parity_check_matrix,one_time_pad = self._key_manager.fetch_key(codeword_len, sparsity)
         decoding_key = (parity_check_matrix, one_time_pad)
+        decoding_error_rate = np.sum((GF(noisy_majority_codeword) + GF(self.codeword)) == 1) /len(self.codeword)
+        print("Decoding Error Rate: ", decoding_error_rate)
+        print("Noisy Majority Codeword", noisy_majority_codeword)
         noisy_codeword = majority_decode(noisy_majority_codeword, codeword_len)
-        print("noisy_codeword", noisy_codeword)
-        print(decode(decoding_key, noisy_codeword))
+        decode(decoding_key, noisy_codeword)
 
     
     def __gen_codeword(self, num_tokens):
@@ -89,8 +90,8 @@ class WaterLLM():
             generator_matrix, parity_check_matrix, one_time_pad = self._key_manager.gen_key(codeword_len, sparsity)
         encoding_key = (generator_matrix, one_time_pad)
         codeword = encode(encoding_key, self.encoding_noise_rate)
-        print("clean_codeword", codeword)
         majority_codeword = majority_encode(codeword, self.majority_encoding_rate)
+        print("Clean Majority Codeword: ", majority_codeword)
         return majority_codeword
 
     def __apply_repetition_penalty(self, logits, generated_ids):
@@ -157,12 +158,14 @@ class WaterLLM():
 
     
     def __sample_response(self, prompt, codeword, num_tokens, is_watermarked): 
+        self.codeword = codeword
+        encoding_errors = 0
         input_ids = self._tokenizer(prompt, return_tensors="pt", add_special_tokens = self.add_special_tokens).to(self._model.device)
         generated_ids = input_ids["input_ids"]
 
         # Initial decoded text
         decoded_so_far = self._tokenizer.decode(generated_ids[0], skip_special_tokens = self.skip_special_tokens)
-        for token_idx in range(num_tokens + self.token_buffer):
+        for token_idx in range(len(codeword) + self.token_buffer):
             # Get logits
             outputs = self._model(input_ids=generated_ids)
             logits = outputs.logits[:, -1, :]
@@ -196,13 +199,14 @@ class WaterLLM():
             
             # Stop if EOS
             if (next_token.item() == self._tokenizer.eos_token_id): 
-                if(token_idx > num_tokens):
+                if(token_idx > len(codeword)):
                     break
             else: 
                 if(is_watermarked and token_idx < len(codeword)): 
                     if(true_bit == desired_bit): 
                         print(f"\033[30;42m{new_token}\033[0m", end = '', flush = True)
                     else: 
+                        encoding_errors += 1
                         print(f"\033[30;41m{new_token}\033[0m", end = '', flush = True)
                 else: 
                     print(f"{new_token}", end = '', flush = True)
@@ -210,7 +214,7 @@ class WaterLLM():
                     break
             decoded_so_far = full_decoded_text
         print()
-
+        print("Encoding Error Rate", encoding_errors / len(codeword))
         # Remove prompt from output and return response
         input_len = input_ids["input_ids"].shape[1]
         response = self._tokenizer.decode(generated_ids[0][input_len:], skip_special_tokens = self.skip_special_tokens)
