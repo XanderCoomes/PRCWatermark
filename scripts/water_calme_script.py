@@ -1,4 +1,4 @@
-from models.water_falcon import WaterFalcon
+from models.water_calme import WaterCalme
 from configs.water_config import WaterConfig
 from configs.generation_config import GenerationConfig
 import numpy as np
@@ -27,13 +27,13 @@ add_special_tokens = False
 gen_config = GenerationConfig(temperature, top_p, repetition_penalty, no_repeat_ngram_size, token_buffer, skip_special_tokens, add_special_tokens)
 
 
-model_name = "DefaultFalcon"
+model_name = "DefaultCalme"
 
-default_falcon = WaterFalcon(model_name, gen_config, water_config)
+default_llama = WaterCalme(model_name, gen_config, water_config)
 
 
 prompt = "Write something about the political state we are in right now"
 num_words = 20
 is_watermarked = True
 
-default_falcon.generate(prompt, num_words, is_watermarked)
+default_llama.generate(prompt, num_words, is_watermarked)

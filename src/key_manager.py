@@ -44,3 +44,16 @@ class KeyManager:
             return None
         
         return GF(g), GF(p), GF(otp)
+    
+    def clear_all_keys(self): 
+        model_dir = self._model_dir()
+        if not os.path.exists(model_dir):
+            return  # Nothing to clear
+
+        for filename in os.listdir(model_dir):
+            if filename.endswith(".npz"):
+                file_path = os.path.join(model_dir, filename)
+                try:
+                    os.remove(file_path)
+                except OSError as e:
+                    print(f"Error deleting {file_path}: {e}")
