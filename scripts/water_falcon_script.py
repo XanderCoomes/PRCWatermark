@@ -20,7 +20,7 @@ temperature = 1.0
 top_p = 0.9
 repetition_penalty = 1.2
 no_repeat_ngram_size = 3
-token_buffer = 0
+token_buffer = 3
 skip_special_tokens = False
 add_special_tokens = False
 
@@ -35,4 +35,6 @@ prompt = "Write a tale of two sitting ducks"
 num_words = 50
 is_watermarked = True
 
-default_falcon.generate(prompt, num_words, is_watermarked)
+response = default_falcon.generate(prompt, num_words, is_watermarked)
+
+default_falcon.detect_water(response)

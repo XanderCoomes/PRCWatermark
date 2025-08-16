@@ -72,7 +72,6 @@ def decode(decoding_key, codeword):
     threshold = binom.ppf(fpr, num_parity_checks, 0.5)
 
     syndrome = parity_check_matrix @ codeword
-    print("Syndrome: ", syndrome)
     failed_parity_checks = np.sum(syndrome == 1)
     
     is_codeword = failed_parity_checks < threshold 

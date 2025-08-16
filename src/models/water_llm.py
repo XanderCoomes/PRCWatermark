@@ -58,17 +58,29 @@ class WaterLLM():
         prompt = self.complete_prompt(prompt)
         codeword = self.__gen_codeword(num_tokens)
         response = self.__sample_response(prompt, codeword, num_tokens, is_watermarked) 
-        self.detect_water(response, num_tokens)
         return response
-    
-    def detect_water(self, text, num_tokens): 
+        
+    @staticmethod
+    def _nearest_pow2(n: int) -> int:
+        if n <= 1:
+            return 1
+        k = n.bit_length() - 1          # floor(log2(n))
+        lower = 1 << k                   # 2^k
+        return lower
+
+    def calc_codeword_len(self, num_tokens): 
+        nearest_pow = self._nearest_pow2(int(num_tokens / self.majority_encoding_rate))
+        return nearest_pow
+
+    def detect_water(self, text): 
         token_ids = self._tokenizer.encode(text, add_special_tokens = self.add_special_tokens)
+        codeword_len = self.calc_codeword_len(len(token_ids))
+        majority_codeword_len = codeword_len * self.majority_encoding_rate
         noisy_majority_codeword = np.empty(0, dtype = int)
-        for tid in token_ids[0 : num_tokens]:
+        for tid in token_ids[0 : majority_codeword_len]:
             h = self.simple_hash(tid)
             noisy_majority_codeword = np.append(noisy_majority_codeword, h) 
         
-        codeword_len = int(num_tokens / self.majority_encoding_rate)
         sparsity = self.sparsity_function(codeword_len)
 
         generator_matrix, parity_check_matrix,one_time_pad = self._key_manager.fetch_key(codeword_len, sparsity)
@@ -81,7 +93,7 @@ class WaterLLM():
 
     
     def __gen_codeword(self, num_tokens):
-        codeword_len = int(num_tokens / self.majority_encoding_rate)
+        codeword_len = self.calc_codeword_len(num_tokens)
         sparsity = self.sparsity_function(codeword_len)
         key = self._key_manager.fetch_key(codeword_len, self.sparsity_function(codeword_len))
         if(key is not None): 
