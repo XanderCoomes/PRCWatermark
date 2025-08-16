@@ -13,7 +13,7 @@ def constant_sparsity_function(codeword_len):
     return 1
 
 encoding_noise_rate =  0.05
-majority_encoding_rate = 1
+majority_encoding_rate = 3
 key_dir = "keys"
 
 water_config = WaterConfig(constant_sparsity_function, encoding_noise_rate, majority_encoding_rate, key_dir)
@@ -34,7 +34,7 @@ default_falcon = WaterFalcon(model_name, gen_config, water_config)
 
 
 prompt = "Write a tale of two sitting ducks"
-num_words = 50                  # give it room to write
+num_words = 100                  # give it room to write
 is_watermarked = True
 
 response = default_falcon.generate(prompt, num_words, is_watermarked)
