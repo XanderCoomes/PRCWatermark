@@ -1,8 +1,6 @@
-from models.water_llm import WaterLLM
+from water_llm import WaterLLM
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
-
-
 
 class WaterFalcon(WaterLLM):
     def __init__(self, model_name, generation_config, water_config):

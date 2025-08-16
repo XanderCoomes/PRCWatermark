@@ -16,8 +16,6 @@ class WaterLLM():
 
         self.name = name
 
-       
-
         self._hash = self.simple_hash
 
         # Generation Config

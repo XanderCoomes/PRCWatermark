@@ -2,6 +2,8 @@ from models.water_tiny_llama import WaterLlama
 from configs.water_config import WaterConfig
 from configs.generation_config import GenerationConfig
 import numpy as np
+from pathlib import Path
+from water_editing import WaterEditor
 
 
 def sparsity_function(codeword_len): 
@@ -11,16 +13,16 @@ def constant_sparsity_function(codeword_len):
     return 1
 
 encoding_noise_rate =  0.00
-majority_encoding_rate = 5 
+majority_encoding_rate = 1
 key_dir = "keys"
 
-water_config = WaterConfig(sparsity_function, encoding_noise_rate, majority_encoding_rate, key_dir)
+water_config = WaterConfig(constant_sparsity_function, encoding_noise_rate, majority_encoding_rate, key_dir)
 
 temperature = 0.8
 top_p = 0.9
 repetition_penalty = 1.2
 no_repeat_ngram_size = 3
-token_buffer = 40
+token_buffer = 1
 skip_special_tokens = False
 add_special_tokens = False
 
@@ -32,8 +34,19 @@ model_name = "DefaultLLama"
 default_llama = WaterLlama(model_name, gen_config, water_config)
 
 
-prompt = "Write something about the political state we are in right now"
-num_words = 60
+num_words = 10                
+
+
+repo_root = Path(__file__).resolve().parents[1] 
+out_dir = repo_root / "watermarked_output" 
+out_dir.mkdir(parents=True, exist_ok=True)
+
+llama_editor = WaterEditor(default_llama, out_dir)
+
+
+prompt = "Write a poem on rain"
 is_watermarked = True
 
-default_llama.generate(prompt, num_words, is_watermarked)
+response = default_llama.generate(prompt, num_words, is_watermarked)
+llama_editor.edit_content(prompt, num_words, response)
+

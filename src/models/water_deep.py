@@ -5,7 +5,7 @@ import os
 import inspect
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from models.water_llm import WaterLLM
+from water_llm import WaterLLM
 
 
 class WaterDeep(WaterLLM):
