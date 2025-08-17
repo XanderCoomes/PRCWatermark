@@ -45,7 +45,7 @@ falcon_editor = WaterEditor(default_falcon, in_dir)
 
 path_to_response = in_dir / "human_text.txt"
 
-falcon_editor.edit_detect_loop(path_to_response)
+falcon_editor.detect_content(path_to_response)
 
 
 

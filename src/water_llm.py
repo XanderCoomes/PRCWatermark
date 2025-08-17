@@ -82,12 +82,17 @@ class WaterLLM():
         
         sparsity = self.sparsity_function(codeword_len)
 
-        generator_matrix, parity_check_matrix,one_time_pad = self._key_manager.fetch_key(codeword_len, sparsity)
+        key = self._key_manager.fetch_key(codeword_len, sparsity)
+        if(key is not None): 
+            generator_matrix, parity_check_matrix, one_time_pad = key
+        else: 
+            generator_matrix, parity_check_matrix, one_time_pad = self._key_manager.gen_key(codeword_len, sparsity)
+     
         decoding_key = (parity_check_matrix, one_time_pad)
         if(self.code_word is not None): 
             decoding_error_rate = np.sum((GF(noisy_majority_codeword) + GF(self.codeword)) == 1) /len(self.codeword)
-            print("Post-Decoding Error Rate: ", decoding_error_rate)
-        print("Noisy Majority Codeword", noisy_majority_codeword)
+            # print("Post-Decoding Error Rate: ", decoding_error_rate)
+        # print("Noisy Majority Codeword", noisy_majority_codeword)
         noisy_codeword = majority_decode(noisy_majority_codeword, codeword_len)
         decode(decoding_key, noisy_codeword)
 
@@ -103,7 +108,7 @@ class WaterLLM():
         encoding_key = (generator_matrix, one_time_pad)
         codeword = encode(encoding_key, self.encoding_noise_rate)
         majority_codeword = majority_encode(codeword, self.majority_encoding_rate)
-        print("Clean Majority Codeword: ", majority_codeword)
+        # print("Clean Majority Codeword: ", majority_codeword)
         return majority_codeword
 
     def __apply_repetition_penalty(self, logits, generated_ids):
@@ -246,8 +251,8 @@ class WaterLLM():
 
         print()  # newline
 
-        if len(codeword) > 0:
-            print("Encoding Error Rate", encoding_errors / len(codeword))
+        # if len(codeword) > 0:
+        #     print("Encoding Error Rate", encoding_errors / len(codeword))
 
         # Final decode of full response (cheap, once)
         input_len = input_batch["input_ids"].shape[1]
