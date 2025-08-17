@@ -5,9 +5,9 @@ import torch.nn.functional as F
 from prc.zero_bit_prc import encode, decode
 from prc.majority_encoding import majority_encode, majority_decode
 import galois
+import sys
 
 GF = galois.GF(2)
-
 
 class WaterLLM(): 
     def __init__(self, name, model, tokenizer, generation_config, water_config):
@@ -34,6 +34,7 @@ class WaterLLM():
         self.key_dir = water_config.key_dir
 
         self._key_manager = KeyManager(self.name, self.key_dir)
+        self.code_word = None
 
     @staticmethod
     def simple_hash(token_id): 
@@ -83,8 +84,9 @@ class WaterLLM():
 
         generator_matrix, parity_check_matrix,one_time_pad = self._key_manager.fetch_key(codeword_len, sparsity)
         decoding_key = (parity_check_matrix, one_time_pad)
-        decoding_error_rate = np.sum((GF(noisy_majority_codeword) + GF(self.codeword)) == 1) /len(self.codeword)
-        print("Decoding Error Rate: ", decoding_error_rate)
+        if(self.code_word is not None): 
+            decoding_error_rate = np.sum((GF(noisy_majority_codeword) + GF(self.codeword)) == 1) /len(self.codeword)
+            print("Post-Decoding Error Rate: ", decoding_error_rate)
         print("Noisy Majority Codeword", noisy_majority_codeword)
         noisy_codeword = majority_decode(noisy_majority_codeword, codeword_len)
         decode(decoding_key, noisy_codeword)
@@ -166,67 +168,93 @@ class WaterLLM():
 
         return biased_probs
 
-    
-    def __sample_response(self, prompt, codeword, num_tokens, is_watermarked): 
+
+    def __sample_response(self, prompt, codeword, num_tokens, is_watermarked):
         self.codeword = codeword
         encoding_errors = 0
-        input_ids = self._tokenizer(prompt, return_tensors="pt", add_special_tokens = self.add_special_tokens).to(self._model.device)
-        generated_ids = input_ids["input_ids"]
 
-        # Initial decoded text
-        decoded_so_far = self._tokenizer.decode(generated_ids[0], skip_special_tokens = self.skip_special_tokens)
-        for token_idx in range(len(codeword) + self.token_buffer):
-            # Get logits
-            outputs = self._model(input_ids=generated_ids)
-            logits = outputs.logits[:, -1, :]
+        # Prepare inputs
+        self._model.eval()
+        input_batch = self._tokenizer(
+            prompt,
+            return_tensors="pt",
+            add_special_tokens=self.add_special_tokens
+        ).to(self._model.device)
+        generated_ids = input_batch["input_ids"]
 
-            # Apply sampling strategies
-            logits = self.__apply_repetition_penalty(logits, generated_ids)
-            logits = self.__apply_no_repeat_ngram(logits, generated_ids)
-            logits = logits / self.temperature
-            probs = F.softmax(logits, dim=-1)
-            probs = self.__apply_top_p_sampling(probs)
+        eos_id = getattr(self._tokenizer, "eos_token_id", None)
+        ending_tokens = {'.', '?', '!'}
 
+        with torch.no_grad():
+            # 1) First forward pass over the full prompt to init KV cache
+            out = self._model(**input_batch, use_cache=True)
+            pkv = out.past_key_values
 
-            # Bias probabilities towards desired bit we are watermarking
-            desired_bit = 0
-            if(is_watermarked and token_idx < len(codeword)):
-                desired_bit = codeword[token_idx]
-                probs = self.__bias_probs(probs, desired_bit)
+            # 2) Token-by-token loop using cache
+            for t in range(len(codeword) + self.token_buffer):
+                out = self._model(
+                    input_ids=generated_ids[:, -1:],
+                    past_key_values=pkv,
+                    use_cache=True
+                )
+                pkv = out.past_key_values
+                logits = out.logits[:, -1, :]  # [1, vocab]
 
-            # Sample token
-            next_token = torch.multinomial(probs, num_samples=1)
+                # Apply sampling strategies
+                logits = self.__apply_repetition_penalty(logits, generated_ids)
+                logits = self.__apply_no_repeat_ngram(logits, generated_ids)
+                if self.temperature and self.temperature != 1.0:
+                    logits = logits / float(self.temperature)
 
+                probs = F.softmax(logits, dim=-1)
+                probs = self.__apply_top_p_sampling(probs)
 
-            true_bit = self._hash(next_token.item())
-            generated_ids = torch.cat([generated_ids, next_token], dim=-1)
-            
-            # Print out newly sampled token
-            full_decoded_text = self._tokenizer.decode(generated_ids[0], skip_special_tokens = self.skip_special_tokens)
-            new_token = full_decoded_text[len(decoded_so_far):]
+                # Watermark bias (optional)
+                desired_bit = 0
+                if is_watermarked and t < len(codeword):
+                    desired_bit = int(codeword[t])
+                    probs = self.__bias_probs(probs, desired_bit)
 
-            ending_tokens = ['.','?','!']
-            
-            # Stop if EOS
-            if (next_token.item() == self._tokenizer.eos_token_id): 
-                if(token_idx > len(codeword)):
+                # Sample next token
+                next_token = torch.multinomial(probs.float(), num_samples=1)  # [1,1]
+                token_id = next_token.item()
+                generated_ids = torch.cat([generated_ids, next_token], dim=-1)
+
+                # Early stop on EOS
+                if eos_id is not None and token_id == eos_id:
                     break
-            else: 
-                if(is_watermarked and token_idx < len(codeword)): 
-                    if(true_bit == desired_bit): 
-                        print(f"\033[30;42m{new_token}\033[0m", end = '', flush = True)
-                    else: 
+
+                # Decode only this token
+                frag = self._tokenizer.decode(
+                    [token_id],
+                    skip_special_tokens=self.skip_special_tokens
+                )
+
+                # Print with color if watermarking
+                if is_watermarked and t < len(codeword):
+                    if self._hash(token_id) == desired_bit:
+                        print(f"\033[30;42m{frag}\033[0m", end='', flush=True)  # green bg
+                    else:
                         encoding_errors += 1
-                        print(f"\033[30;41m{new_token}\033[0m", end = '', flush = True)
-                else: 
-                    print(f"{new_token}", end = '', flush = True)
-                if(new_token in ending_tokens and token_idx > num_tokens): 
+                        print(f"\033[30;41m{frag}\033[0m", end='', flush=True)  # red bg
+                else:
+                    print(frag, end='', flush=True)
+
+                # Optional end condition
+                if frag in ending_tokens and t > num_tokens:
                     break
-            decoded_so_far = full_decoded_text
-        print()
-        print("Encoding Error Rate", encoding_errors / len(codeword))
-        # Remove prompt from output and return response
-        input_len = input_ids["input_ids"].shape[1]
-        response = self._tokenizer.decode(generated_ids[0][input_len:], skip_special_tokens = self.skip_special_tokens)
-       
+
+        print()  # newline
+
+        if len(codeword) > 0:
+            print("Encoding Error Rate", encoding_errors / len(codeword))
+
+        # Final decode of full response (cheap, once)
+        input_len = input_batch["input_ids"].shape[1]
+        response = self._tokenizer.decode(
+            generated_ids[0][input_len:],
+            skip_special_tokens=self.skip_special_tokens
+        )
         return response
+
+

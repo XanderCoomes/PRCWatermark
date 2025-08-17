@@ -1,16 +1,19 @@
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from water_llm import WaterLLM
 from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
 
-class WaterFalcon(WaterLLM):
+class WaterQwen(WaterLLM):
     def __init__(self, model_name, generation_config, water_config):
-        model_id = "tiiuae/falcon-7b-instruct"  # Falcon-H1-34B on Hugging Face
+        model_id = "Qwen/Qwen3-4B-Instruct-2507"
+        # load the tokenizer and the model
         tokenizer = AutoTokenizer.from_pretrained(model_id)
         model = AutoModelForCausalLM.from_pretrained(
             model_id,
-            device_map="auto",            # Automatically map to available GPUs
-            torch_dtype=torch.bfloat16,    # Falcon-H1-34B prefers bfloat16 if GPU supports it
-            attn_implementation="eager"   # <-- key fix
-
+            torch_dtype="auto",
+            device_map="auto"
         )
         super().__init__(model_name, model, tokenizer, generation_config, water_config)
+
+
+# We suggest using Temperature = 0.7, TopP = 0.8, TopK = 20, and MinP = 0.
+

@@ -82,7 +82,7 @@ def decode(decoding_key, codeword):
 
     # P[X > k] = 1 - CDF(k)
     prob = 1 - binom.sf(k, n, p)
-    print(f"{prob:.2f}")
+    print(f"{prob}")
 
     return is_codeword  
 

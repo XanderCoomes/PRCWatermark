@@ -8,6 +8,9 @@ galois
 #Testing
 pytest
 
+#VLLM
+vllm
+
 #ML
 transformers
 torch
