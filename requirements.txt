@@ -19,3 +19,12 @@ sentencepiece
 
 #Setup Package
 -e .
+
+
+#Other
+fastapi>=0.111
+uvicorn[standard]>=0.30
+accelerate>=0.30
+python-dotenv>=1.0
+
+create-vite>=7.1.1
