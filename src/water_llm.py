@@ -34,47 +34,43 @@ class WaterLLM():
         self.key_dir = water_config.key_dir
 
         self._key_manager = KeyManager(self.name, self.key_dir)
-        self.code_word = None
-
+        self.maj_code_word = None
     @staticmethod
     def simple_hash(token_id): 
-        if(token_id % 2 == 0): 
-            return 0
-        else: 
-            return 1
+        return 0 if (token_id % 2 == 0) else 1
+
     def complete_prompt(self, prompt): 
-        full_prompt = "<|system|> You are an academic and mindful assistant. <|user|>"  + prompt + "<|assistant|>"
-        return full_prompt
+        return "<|system|> You are an academic and mindful assistant. <|user|>" + prompt + "<|assistant|>"
     
     def generate(self, prompt, num_words, is_watermarked):
-        print("Prompt: ", prompt)
-        if(is_watermarked): 
-            text = "Watermarked"
-        else: 
-            text = "Dry"
-        print(text, " Text: ")
-        num_tokens = int(num_words * 1.33)
-        prompt = self.complete_prompt(prompt)
-        codeword = self.__gen_codeword(num_tokens)
-        response = self.__sample_response(prompt, codeword, num_tokens, is_watermarked) 
-        return response
-        
-    @staticmethod
-    def _nearest_pow2(n: int) -> int:
-        if n <= 1:
-            return 1
-        k = n.bit_length() - 1          # floor(log2(n))
-        lower = 1 << k                   # 2^k
-        return lower
+        """
+        Return the full response as a string (backwards-compatible).
+        Internally drives the token-yielding generator to build the string.
+        """
+        pieces = []
+        for frag in self.generate_iter(prompt, num_words, is_watermarked):
+            pieces.append(frag)
+        return "".join(pieces)
+    
+    def detect_water(self, text):
+        token_ids = self._tokenizer.encode(text, add_special_tokens=self.add_special_tokens)
+        tokens = len(token_ids)
 
-    def calc_codeword_len(self, num_tokens): 
-        nearest_pow = self._nearest_pow2(int(num_tokens / self.majority_encoding_rate))
-        return nearest_pow
+        watermarked_prob = 0.0
+        codeword_len = 16
 
-    def detect_water(self, text): 
-        token_ids = self._tokenizer.encode(text, add_special_tokens = self.add_special_tokens)
-        codeword_len = self.calc_codeword_len(len(token_ids))
+        # Only consider codeword_len where we can actually fill all majority groups
+        while codeword_len * self.majority_encoding_rate <= tokens:
+            prob = self.detect_water_given_length(text, codeword_len)
+            watermarked_prob = max(watermarked_prob, prob)
+            codeword_len *= 2
+
+        return watermarked_prob
+
+
+    def detect_water_given_length(self, text, codeword_len): 
         majority_codeword_len = codeword_len * self.majority_encoding_rate
+        token_ids = self._tokenizer.encode(text, add_special_tokens = self.add_special_tokens)
         noisy_majority_codeword = np.empty(0, dtype = int)
         for tid in token_ids[0 : majority_codeword_len]:
             h = self.simple_hash(tid)
@@ -88,15 +84,29 @@ class WaterLLM():
         else: 
             generator_matrix, parity_check_matrix, one_time_pad = self._key_manager.gen_key(codeword_len, sparsity)
      
-        decoding_key = (parity_check_matrix, one_time_pad)
-        if(self.code_word is not None): 
-            decoding_error_rate = np.sum((GF(noisy_majority_codeword) + GF(self.codeword)) == 1) /len(self.codeword)
-            # print("Post-Decoding Error Rate: ", decoding_error_rate)
-        # print("Noisy Majority Codeword", noisy_majority_codeword)
-        noisy_codeword = majority_decode(noisy_majority_codeword, codeword_len)
-        decode(decoding_key, noisy_codeword)
-
     
+        decoding_key = (parity_check_matrix, one_time_pad)
+        # if(self.maj_code_word is not None): 
+        #     decoding_error_rate = np.sum((GF(noisy_majority_codeword) + GF(self.maj_code_word)) == 1) / len(self.maj_code_word)
+        #     print("Decoding Error Rate:", decoding_error_rate)
+        noisy_codeword = majority_decode(noisy_majority_codeword, codeword_len)
+        return decode(decoding_key, noisy_codeword, sparsity)
+    
+         
+    @staticmethod
+    def _nearest_pow2(n: int) -> int:
+        if n <= 1:
+            return 1
+        k = n.bit_length() - 1          # floor(log2(n))
+        lower = 1 << k                   # 2^k
+        return lower
+
+    def calc_codeword_len(self, num_tokens): 
+        nearest_pow = self._nearest_pow2(int(num_tokens / self.majority_encoding_rate))
+        return nearest_pow
+
+        
+
     def __gen_codeword(self, num_tokens):
         codeword_len = self.calc_codeword_len(num_tokens)
         sparsity = self.sparsity_function(codeword_len)
@@ -108,26 +118,26 @@ class WaterLLM():
         encoding_key = (generator_matrix, one_time_pad)
         codeword = encode(encoding_key, self.encoding_noise_rate)
         majority_codeword = majority_encode(codeword, self.majority_encoding_rate)
-        # print("Clean Majority Codeword: ", majority_codeword)
+        self.maj_code_word = majority_codeword
         return majority_codeword
 
     def __apply_repetition_penalty(self, logits, generated_ids):
-        if self. repetition_penalty != 1.0:
+        if self.repetition_penalty != 1.0:
             for token_id in set(generated_ids[0].tolist()):
                 logits[0, token_id] /= self.repetition_penalty
         return logits
 
     def __apply_no_repeat_ngram(self, logits, generated_ids):
         if self.no_repeat_ngram_size > 0 and generated_ids.size(1) >= self.no_repeat_ngram_size:
-                banned_tokens = []
-                context = generated_ids[0].tolist()
-                prev_ngram = tuple(context[-(self.no_repeat_ngram_size - 1):])
-                for i in range(len(context) - self.no_repeat_ngram_size + 1):
-                    ngram = tuple(context[i:i + self.no_repeat_ngram_size])
-                    if tuple(ngram[:-1]) == prev_ngram:
-                        banned_tokens.append(ngram[-1])
-                for token in banned_tokens:
-                    logits[0, token] = -float("inf")
+            banned_tokens = []
+            context = generated_ids[0].tolist()
+            prev_ngram = tuple(context[-(self.no_repeat_ngram_size - 1):])
+            for i in range(len(context) - self.no_repeat_ngram_size + 1):
+                ngram = tuple(context[i:i + self.no_repeat_ngram_size])
+                if tuple(ngram[:-1]) == prev_ngram:
+                    banned_tokens.append(ngram[-1])
+            for token in banned_tokens:
+                logits[0, token] = -float("inf")
         return logits
     
     def __apply_top_p_sampling(self, probs): 
@@ -141,42 +151,42 @@ class WaterLLM():
         probs = probs / probs.sum()
         return probs
 
-      #Bias probabilities towards so that the sampled token's hash matches bit
+    # Bias probabilities so that the sampled token's hash matches bit
     def __bias_probs(self, probs, bit):
         vocab_size = probs.shape[-1]
         device = probs.device
 
-        # Vectorize hash over all indices once
         token_hash_vals = torch.tensor([self._hash(i) for i in range(vocab_size)], device=device)
-
-        # Mask where hash == bit
         bits_to_boost = (token_hash_vals == bit)
         
-        # Extract total probabilitiy of sampling a token with hash == bit
         group_probs = probs[0][bits_to_boost]
         unbiased_bit_prob = group_probs.sum().item()
 
-        # Handle edge cases - avoid a divide by zero
         if unbiased_bit_prob == 0.0 or unbiased_bit_prob == 1.0:
             return probs
 
-        # Compute biased sum
         biased_bit_prob = 1.0 if unbiased_bit_prob > 0.5 else 2 * unbiased_bit_prob
 
-        #Boost the probabilities of bits which agree with 'bit' and reduce others
         biased_probs = probs.clone()
         biased_probs[0, bits_to_boost] = (probs[0, bits_to_boost] / unbiased_bit_prob) * biased_bit_prob
         biased_probs[0, ~bits_to_boost] = (probs[0, ~bits_to_boost] / (1 - unbiased_bit_prob)) * (1 - biased_bit_prob)
 
-        # Normalize
         biased_probs = biased_probs / biased_probs.sum()
-
         return biased_probs
 
+    # NEW: token-by-token generator (sync generator)
+    def generate_iter(self, prompt, num_words, is_watermarked):
+        """
+        Yield decoded text fragments as they are generated.
+        - Keeps original printing behavior (colored for watermark agreement).
+        - External callers can consume this generator for streaming.
+        """
+        print("Prompt: ", prompt)
+        print(("Watermarked" if is_watermarked else "Dry"), " Text: ")
 
-    def __sample_response(self, prompt, codeword, num_tokens, is_watermarked):
-        self.codeword = codeword
-        encoding_errors = 0
+        num_tokens = int(num_words * 1.33)
+        prompt = self.complete_prompt(prompt)
+        codeword = self.__gen_codeword(num_tokens)
 
         # Prepare inputs
         self._model.eval()
@@ -189,6 +199,8 @@ class WaterLLM():
 
         eos_id = getattr(self._tokenizer, "eos_token_id", None)
         ending_tokens = {'.', '?', '!'}
+
+        encoding_errors = 0
 
         with torch.no_grad():
             # 1) First forward pass over the full prompt to init KV cache
@@ -245,21 +257,12 @@ class WaterLLM():
                 else:
                     print(frag, end='', flush=True)
 
+                # Yield this fragment for streaming
+                yield frag
+
                 # Optional end condition
-                if frag in ending_tokens and t > num_tokens:
+                if frag in ending_tokens and t > len(codeword):
                     break
-
-        print()  # newline
-
-        # if len(codeword) > 0:
-        #     print("Encoding Error Rate", encoding_errors / len(codeword))
-
-        # Final decode of full response (cheap, once)
-        input_len = input_batch["input_ids"].shape[1]
-        response = self._tokenizer.decode(
-            generated_ids[0][input_len:],
-            skip_special_tokens=self.skip_special_tokens
-        )
-        return response
-
-
+        print()
+        print("Encoding Error Rate:", encoding_errors / len(codeword))
+        print()  # newline at end of generation

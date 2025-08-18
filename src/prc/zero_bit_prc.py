@@ -61,30 +61,43 @@ def encode(encoding_key, noise_rate):
     codeword = (generator_matrix @ secret + one_time_pad + error)
     return codeword
 
-def decode(decoding_key, codeword):  
-    fpr = 0.05
+def decode(decoding_key, codeword, sparsity):  
     parity_check_matrix, one_time_pad = decoding_key
     codeword_len = len(codeword)
     num_parity_checks = calc_num_parity_checks(codeword_len)
 
     codeword = GF(codeword) + one_time_pad
-    
-    threshold = binom.ppf(fpr, num_parity_checks, 0.5)
-
     syndrome = parity_check_matrix @ codeword
     failed_parity_checks = np.sum(syndrome == 1)
     
-    is_codeword = failed_parity_checks < threshold 
-    print(f"Probability that a Non-Watermarked Response would carry this signal: ", end = "")
+
     n = num_parity_checks
     k = failed_parity_checks
-    p = 0.5
+    p_random = 0.5
 
-    # P[X > k] = 1 - CDF(k)
-    prob = binom.sf(k, n, p) # probability that the text is watermarked FIXMEEE this is not actually the right probability
-    print(f"{prob}")
+    prob_given_dry = binom.pmf(k, n, p_random)
 
-    return prob  
+    assumed_error_rate = 0.3
+
+    p_water = (1 - (1 - 2 * assumed_error_rate)**sparsity) / 2
+
+    prob_given_water = binom.pmf(k, n, p_water)
+
+    prob_watermarked = prob_given_water / (prob_given_water + prob_given_dry)
+
+    return prob_watermarked
+
+
+
+
+
+    
+
+
+    
+
+   
+     
 
 
 

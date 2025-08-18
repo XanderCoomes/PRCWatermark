@@ -4,15 +4,15 @@ export default function App() {
   const [text, setText] = useState('')
   const [response, setResponse] = useState('')
 
-  // numeric input: keep display as string (avoid 02 etc.), parse number for logic
-  const [targetCountInput, setTargetCountInput] = useState('') // starts BLANK
-  const [targetCount, setTargetCount] = useState(0)            // logic default
+  // Word Count
+  const [targetCountInput, setTargetCountInput] = useState('')
+  const [targetCount, setTargetCount] = useState(0)
 
   // Detect panel
   const [detectText, setDetectText] = useState('')
-  const [detectProb, setDetectProb] = useState(null)  // null until run
+  const [detectProb, setDetectProb] = useState(null)
   const [isDetecting, setIsDetecting] = useState(false)
-  const [detectStatusText, setDetectStatusText] = useState('') // animated "Detecting..." text
+  const [detectStatusText, setDetectStatusText] = useState('')
   const detectControllerRef = useRef(null)
   const dotsIntervalRef = useRef(null)
 
@@ -26,7 +26,8 @@ export default function App() {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    minHeight: 0,
+    minHeight: 0,  // allow inner flex children to shrink & scroll
+    minWidth: 0,   // prevent grid overflow
   }
 
   const boxStyle = {
@@ -39,22 +40,33 @@ export default function App() {
     fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
     fontSize: 17,
     lineHeight: 1.5,
+    whiteSpace: 'pre-wrap',
+    overflowWrap: 'anywhere',
+    wordBreak: 'break-word',
+    maxWidth: '100%',
   }
 
-  // ----- Run the streaming check ONLY when user presses Enter in the prompt -----
-  async function runCheck() {
+  // ---- Helpers ----
+  function canGenerate(promptVal = text, wcInputVal = targetCountInput) {
+    const hasPrompt = (promptVal || '').trim().length > 0
+    const wcNum = parseInt(wcInputVal, 10)
+    const hasWC = wcInputVal !== '' && Number.isFinite(wcNum) && wcNum > 0
+    return hasPrompt && hasWC
+  }
+
+  // ----- Run the streaming check -----
+  async function runCheck(wordCountOverride) {
+    if (!canGenerate()) return
+
     const story = text.trim()
-    if (!story) {
-      setResponse('')
-      return
-    }
+    const wc = typeof wordCountOverride === 'number' ? wordCountOverride : targetCount
 
     try {
-      setResponse('') // clear previous result
+      setResponse('')
       const res = await fetch('/api/check_stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ story, word_count: targetCount }),
+        body: JSON.stringify({ story, word_count: wc }),
       })
       if (!res.ok) {
         const msg = await res.text().catch(() => '')
@@ -67,7 +79,6 @@ export default function App() {
         return
       }
 
-      // stream word-by-word
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let acc = ''
@@ -84,30 +95,26 @@ export default function App() {
     }
   }
 
-  // Intercept Enter in the left textarea: Enter -> runCheck, Shift+Enter -> newline
+  // Enter in the left textarea: runCheck; Shift+Enter: newline
   function handleTextareaKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      runCheck()
+      if (canGenerate(e.currentTarget.value, targetCountInput)) {
+        runCheck()
+      }
     }
   }
 
-  // --- numeric input normalization (prevents "02" etc.) ---
+  // --- Word Count normalization ---
   function handleTargetChange(e) {
     let v = e.target.value
-
     if (v === '') {
       setTargetCountInput('')
-      setTargetCount(0) // blank means 0 for logic
+      setTargetCount(0)
       return
     }
-
-    // digits only
     v = v.replace(/[^\d]/g, '')
-
-    // strip leading zeros (but allow single "0")
     if (v.length > 1) v = v.replace(/^0+(?=\d)/, '')
-
     setTargetCountInput(v)
     setTargetCount(parseInt(v || '0', 10))
   }
@@ -115,36 +122,34 @@ export default function App() {
   function handleTargetBlur() {
     if (targetCountInput === '') {
       setTargetCount(0)
-      // leave targetCountInput as '' so the box stays blank
     }
   }
 
   function handleWordCountKeyDown(e) {
     if (e.key === 'Enter') {
       e.preventDefault()
-      // Make sure we parse the latest value before running
       let v = e.currentTarget.value.replace(/[^\d]/g, '')
       if (v.length > 1) v = v.replace(/^0+(?=\d)/, '')
+      const parsed = parseInt(v || '0', 10)
       setTargetCountInput(v)
-      setTargetCount(parseInt(v || '0', 10))
-      runCheck()
+      setTargetCount(parsed)
+      if (canGenerate(text, v)) {
+        runCheck(parsed)
+      }
     }
   }
-  // --------------------------------------------------------
 
   // ----- Detect: only run on Enter in the Detect textarea -----
   async function runDetect() {
     const payload = detectText.trim()
     if (!payload || isDetecting) return
 
-    // Abort any in-flight request (just in case)
     if (detectControllerRef.current) {
       detectControllerRef.current.abort()
     }
     const controller = new AbortController()
     detectControllerRef.current = controller
 
-    // Start animated "Detecting..." status
     setIsDetecting(true)
     setDetectProb(null)
     startDetectingDots()
@@ -177,7 +182,6 @@ export default function App() {
     }
   }
 
-  // Animated "Detecting..." helper
   function startDetectingDots() {
     setDetectStatusText('Detecting')
     if (dotsIntervalRef.current) clearInterval(dotsIntervalRef.current)
@@ -188,7 +192,6 @@ export default function App() {
       setDetectStatusText(frames[i])
     }, 300)
   }
-
   function stopDetectingDots() {
     if (dotsIntervalRef.current) {
       clearInterval(dotsIntervalRef.current)
@@ -196,8 +199,6 @@ export default function App() {
     }
     setDetectStatusText('')
   }
-
-  // Cleanup interval on unmount
   useEffect(() => {
     return () => {
       if (dotsIntervalRef.current) clearInterval(dotsIntervalRef.current)
@@ -205,7 +206,6 @@ export default function App() {
     }
   }, [])
 
-  // Enter to run detection, Shift+Enter for newline
   function handleDetectKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -224,7 +224,7 @@ export default function App() {
           height: '100vh',
           boxSizing: 'border-box',
           fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-          fontSize: 17, // base size for everything
+          fontSize: 17,
           lineHeight: 1.6,
         }}
       >
@@ -235,41 +235,51 @@ export default function App() {
             gridTemplateColumns: '2fr 1.1fr',
             gap: 28,
             alignItems: 'stretch',
-            height: 'calc(100vh - 56px)', // account for padding
+            height: 'calc(100vh - 56px)',
+            minHeight: 0, // critical for children to be able to scroll
           }}
         >
           {/* LEFT: Generator panel */}
-          <div style={{ minHeight: 0 }}>
+          <div style={{ minHeight: 0, minWidth: 0 }}>
             <div style={cardStyle}>
-              {/* Response area fills available vertical space */}
-              <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              {/* Response area */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  flex: 1,
+                  minHeight: 0, // allow inner flex child to take remaining space
+                }}
+              >
                 <h3 style={{ color: '#38bdf8', marginTop: 0, fontSize: 22, lineHeight: 1.3 }}>
                   Response
                 </h3>
+                {/* Make THIS grey box the scroll container */}
                 <div
                   style={{
                     ...boxStyle,
+                    flex: 1,
                     minHeight: 0,
-                    height: '100%',
-                    whiteSpace: 'pre-wrap',
-                    fontSize: 17,
+                    overflowY: 'auto',   // vertical scroll here
                   }}
                 >
                   {response}
                 </div>
               </div>
 
-              {/* Prompt area at the bottom */}
+              {/* Prompt + Word Count */}
               <div style={{ marginTop: 20, borderTop: '1px solid #475569', paddingTop: 18 }}>
                 <div
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'flex-end',
+                    gap: 12,
+                    flexWrap: 'wrap',
                   }}
                 >
                   <h2 style={{ color: '#38bdf8', margin: 0, fontSize: 26, lineHeight: 1.2 }}>
-                    What can I help with? 
+                    What can I help you with?
                   </h2>
                   <span
                     style={{
@@ -283,7 +293,7 @@ export default function App() {
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', gap: 14, marginTop: 10 }}>
+                <div style={{ display: 'flex', gap: 14, marginTop: 10, minHeight: 0 }}>
                   <textarea
                     value={text}
                     onChange={(e) => setText(e.target.value)}
@@ -293,6 +303,8 @@ export default function App() {
                       ...boxStyle,
                       flex: 1,
                       minHeight: 160,
+                      maxHeight: 280,
+                      overflowY: 'auto',   // scroll inside the textarea
                       resize: 'vertical',
                       outline: 'none',
                       fontSize: 18,
@@ -305,7 +317,7 @@ export default function App() {
                     value={targetCountInput}
                     onChange={handleTargetChange}
                     onBlur={handleTargetBlur}
-                    onKeyDown={handleWordCountKeyDown}   // ← add this
+                    onKeyDown={handleWordCountKeyDown}
                     style={{
                       ...boxStyle,
                       width: 172,
@@ -314,7 +326,7 @@ export default function App() {
                       paddingTop: 12,
                       paddingBottom: 12,
                     }}
-                    placeholder="Word Count" // starts blank
+                    placeholder="Word Count"
                   />
                 </div>
               </div>
@@ -322,23 +334,31 @@ export default function App() {
           </div>
 
           {/* RIGHT: Detect panel */}
-          <div style={{ minHeight: 0 }}>
+          <div style={{ minHeight: 0, minWidth: 0 }}>
             <div style={cardStyle}>
               <h2 style={{ color: '#38bdf8', marginTop: 0, fontSize: 26, lineHeight: 1.2 }}>
                 Detect
               </h2>
 
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  flex: 1,
+                  minHeight: 0,
+                }}
+              >
                 <textarea
                   value={detectText}
                   onChange={(e) => setDetectText(e.target.value)}
-                  onKeyDown={handleDetectKeyDown}  // Enter to run detection (Shift+Enter = newline)
-                  placeholder="Enter text to check for AI"
+                  onKeyDown={handleDetectKeyDown}
+                  placeholder="Enter text to check for AI (Enter to detect)"
                   style={{
                     ...boxStyle,
                     flex: 1,
-                    minHeight: 0,
-                    height: '100%',
+                    minHeight: 140,
+                    maxHeight: '60vh',
+                    overflowY: 'auto',
                     resize: 'vertical',
                     outline: 'none',
                     fontSize: 18,
@@ -346,9 +366,16 @@ export default function App() {
                 />
               </div>
 
-              {/* Probability Text is AI (title + status). Box shows ONLY percentage */}
+              {/* Probability Text is AI */}
               <div style={{ marginTop: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '0 0 8px 0' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'baseline',
+                    margin: '0 0 8px 0',
+                  }}
+                >
                   <h3 style={{ color: '#38bdf8', margin: 0, fontSize: 20, lineHeight: 1.3 }}>
                     Probability Text is AI
                   </h3>
@@ -359,14 +386,12 @@ export default function App() {
                 <div
                   style={{
                     ...boxStyle,
-                    whiteSpace: 'pre-wrap',
                     textAlign: 'center',
                     fontSize: 24,
                     fontWeight: 700,
                   }}
                 >
-                  {/* Only show percentage; blank otherwise */}
-                  {detectProb == null ? '' : `${Math.round(detectProb * 100)}%`}
+                  {detectProb == null ? '' : `${detectProb * 100}%`}
                 </div>
               </div>
             </div>
