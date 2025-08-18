@@ -81,10 +81,10 @@ def decode(decoding_key, codeword):
     p = 0.5
 
     # P[X > k] = 1 - CDF(k)
-    prob = 1 - binom.sf(k, n, p)
+    prob = binom.sf(k, n, p) # probability that the text is watermarked FIXMEEE this is not actually the right probability
     print(f"{prob}")
 
-    return is_codeword  
+    return prob  
 
 
 

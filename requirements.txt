@@ -8,9 +8,6 @@ galois
 #Testing
 pytest
 
-#VLLM
-vllm
-
 #ML
 transformers
 torch
@@ -21,10 +18,7 @@ sentencepiece
 -e .
 
 
-#Other
-fastapi>=0.111
-uvicorn[standard]>=0.30
-accelerate>=0.30
-python-dotenv>=1.0
-
-create-vite>=7.1.1
+#React Stuff
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+pydantic==2.8.2

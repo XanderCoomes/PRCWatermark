@@ -10,7 +10,7 @@ class WaterEditor():
         res = self.get_out_path(self.output_dir, prompt, num_words)
         current_text = response
         res.write_text(current_text, encoding="utf-8")
-    def detect_content(self, response_path): 
+    def detect_content_from_path(self, response_path): 
         edited_text = response_path.read_text(encoding="utf-8")
         print("Text: ", edited_text)
         print("\nDetecting watermark on your edited text...")
