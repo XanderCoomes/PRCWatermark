@@ -1,0 +1,5 @@
+250-300 words
+
+The integration of Artificial Intelligence (AI) into education has emerged as a transformative force, offering personalized learning experiences, improved accessibility, and enhanced instructional efficiency. One of its most significant contributions is adaptive learning—AI systems analyze students' performance to tailor content delivery according to individual needs, pace, and strengths. This personalization helps bridge gaps in understanding, especially for learners with diverse abilities or backgrounds.
+
+Another vital application lies in automating administrative tasks such as grading essays, managing attendance, or organizing lesson plans. By handling repetitive functions, educators can focus more on pedagogical strategies and student interaction. Moreover

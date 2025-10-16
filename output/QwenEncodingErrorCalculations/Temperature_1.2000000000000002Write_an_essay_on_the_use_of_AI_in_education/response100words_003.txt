@@ -1,0 +1,5 @@
+ title: The Use of Artificial Intelligence in Education
+
+In recent years, artificial intelligence (AI) has transitioned from being a futuristic concept to becoming part of everyday life — including within educational institutions. As schools strive to provide personalized learning experiences, improve teaching effectiveness, and meet diverse student needs, AI technologies have emerged as powerful tools that can significantly enhance pedagogical practices. From automated grading systems to intelligent tutoring platforms and predictive analytics for student performance, AI is reshaping how knowledge is delivered, accessed, and assessed.
+
+One of the most compelling applications of AI lies in its ability to offer individualized instruction tailored to each learner’s pace, interests

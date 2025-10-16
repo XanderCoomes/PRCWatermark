@@ -3,18 +3,22 @@ import React, { useState, useRef, useEffect } from 'react'
 export default function App() {
   const [text, setText] = useState('')
   const [response, setResponse] = useState('')
-
-  // Word Count
   const [targetCountInput, setTargetCountInput] = useState('')
   const [targetCount, setTargetCount] = useState(0)
-
-  // Detect panel
+  const [isWatermark, setIsWatermark] = useState(true)
+  const [temperature, setTemperature] = useState(1.0)
   const [detectText, setDetectText] = useState('')
   const [detectProb, setDetectProb] = useState(null)
   const [isDetecting, setIsDetecting] = useState(false)
   const [detectStatusText, setDetectStatusText] = useState('')
+  const [copyStatus, setCopyStatus] = useState('Copy')
+
   const detectControllerRef = useRef(null)
   const dotsIntervalRef = useRef(null)
+
+  // --- Temperature slider refs/state ---
+  const tempBarRef = useRef(null)
+  const isDraggingTempRef = useRef(false)
 
   // Card + field styles
   const cardStyle = {
@@ -26,8 +30,8 @@ export default function App() {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    minHeight: 0,  // allow inner flex children to shrink & scroll
-    minWidth: 0,   // prevent grid overflow
+    minHeight: 0,
+    minWidth: 0,
   }
 
   const boxStyle = {
@@ -57,7 +61,6 @@ export default function App() {
   // ----- Run the streaming check -----
   async function runCheck(wordCountOverride) {
     if (!canGenerate()) return
-
     const story = text.trim()
     const wc = typeof wordCountOverride === 'number' ? wordCountOverride : targetCount
 
@@ -66,23 +69,21 @@ export default function App() {
       const res = await fetch('/api/check_stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ story, word_count: wc }),
+        body: JSON.stringify({
+          story,
+          word_count: wc,
+          temperature,
+          is_watermarked: isWatermark,
+        }),
       })
-      if (!res.ok) {
-        const msg = await res.text().catch(() => '')
-        throw new Error(`HTTP ${res.status} ${msg}`)
-      }
-
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       if (!res.body) {
-        const full = await res.text()
-        setResponse(full)
+        setResponse(await res.text())
         return
       }
-
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let acc = ''
-
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
@@ -95,17 +96,13 @@ export default function App() {
     }
   }
 
-  // Enter in the left textarea: runCheck; Shift+Enter: newline
   function handleTextareaKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (canGenerate(e.currentTarget.value, targetCountInput)) {
-        runCheck()
-      }
+      if (canGenerate(e.currentTarget.value, targetCountInput)) runCheck()
     }
   }
 
-  // --- Word Count normalization ---
   function handleTargetChange(e) {
     let v = e.target.value
     if (v === '') {
@@ -120,9 +117,7 @@ export default function App() {
   }
 
   function handleTargetBlur() {
-    if (targetCountInput === '') {
-      setTargetCount(0)
-    }
+    if (targetCountInput === '') setTargetCount(0)
   }
 
   function handleWordCountKeyDown(e) {
@@ -133,23 +128,17 @@ export default function App() {
       const parsed = parseInt(v || '0', 10)
       setTargetCountInput(v)
       setTargetCount(parsed)
-      if (canGenerate(text, v)) {
-        runCheck(parsed)
-      }
+      if (canGenerate(text, v)) runCheck(parsed)
     }
   }
 
-  // ----- Detect: only run on Enter in the Detect textarea -----
+  // ----- Detect -----
   async function runDetect() {
     const payload = detectText.trim()
     if (!payload || isDetecting) return
-
-    if (detectControllerRef.current) {
-      detectControllerRef.current.abort()
-    }
+    if (detectControllerRef.current) detectControllerRef.current.abort()
     const controller = new AbortController()
     detectControllerRef.current = controller
-
     setIsDetecting(true)
     setDetectProb(null)
     startDetectingDots()
@@ -161,13 +150,9 @@ export default function App() {
         body: JSON.stringify({ text: payload }),
         signal: controller.signal,
       })
-      if (!res.ok) {
-        const msg = await res.text().catch(() => '')
-        throw new Error(`HTTP ${res.status} ${msg}`)
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      if (typeof data.prob === 'number') setDetectProb(data.prob)
-      else setDetectProb(null)
+      setDetectProb(typeof data.prob === 'number' ? data.prob : null)
     } catch (err) {
       if (err?.name !== 'AbortError') {
         console.error(err)
@@ -175,9 +160,7 @@ export default function App() {
       }
     } finally {
       stopDetectingDots()
-      if (detectControllerRef.current === controller) {
-        detectControllerRef.current = null
-      }
+      if (detectControllerRef.current === controller) detectControllerRef.current = null
       setIsDetecting(false)
     }
   }
@@ -212,7 +195,99 @@ export default function App() {
       runDetect()
     }
   }
-  // --------------------------------------------------------
+
+  // Copy function
+  function copyResponse() {
+    if (response) {
+      navigator.clipboard.writeText(response).then(() => {
+        setCopyStatus('Copied!')
+        setTimeout(() => setCopyStatus('Copy'), 1200)
+      })
+    }
+  }
+
+  // ---- Temperature visuals and interactions ----
+  const tempPct = Math.max(0, Math.min(1, (temperature - 0.5) / 1.0)) // 0..1
+  const tempHue = 200 - 190 * tempPct // blue -> red
+  const tempColor = `hsl(${tempHue}, 80%, 55%)`
+  const tempEmoji = temperature < 0.8 ? '🧊' : temperature < 1.2 ? '🌡️' : '🔥'
+
+  function pctToTemp(p) {
+    const clamped = Math.max(0, Math.min(1, p))
+    return 0.5 + clamped * 1.0 // maps 0..1 to 0.5..1.5
+  }
+  function tempToPct(t) {
+    return Math.max(0, Math.min(1, (t - 0.5) / 1.0))
+  }
+  function updateTempFromClientX(clientX) {
+    const el = tempBarRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const p = (clientX - rect.left) / rect.width
+    setTemperature(parseFloat(pctToTemp(p).toFixed(2)))
+  }
+
+  // Drag handlers
+  useEffect(() => {
+    function onMove(e) {
+      if (!isDraggingTempRef.current) return
+      if (e.type === 'mousemove') {
+        updateTempFromClientX(e.clientX)
+      } else if (e.type === 'touchmove') {
+        if (e.touches && e.touches[0]) updateTempFromClientX(e.touches[0].clientX)
+      }
+    }
+    function onUp() {
+      isDraggingTempRef.current = false
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('touchmove', onMove, { passive: false })
+    window.addEventListener('touchend', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('touchmove', onMove)
+      window.removeEventListener('touchend', onUp)
+    }
+  }, [])
+
+  function handleTempBarMouseDown(e) {
+    isDraggingTempRef.current = true
+    updateTempFromClientX(e.clientX)
+  }
+  function handleTempBarTouchStart(e) {
+    isDraggingTempRef.current = true
+    if (e.touches && e.touches[0]) updateTempFromClientX(e.touches[0].clientX)
+  }
+  function handleTempBarClick(e) {
+    // Single click anywhere on the bar sets the temperature
+    updateTempFromClientX(e.clientX)
+  }
+  function handleTempBarKeyDown(e) {
+    // Accessible keyboard interactions
+    const stepSmall = 0.01
+    const stepBig = 0.05
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      setTemperature(t => Math.min(1.5, parseFloat((t + stepSmall).toFixed(2))))
+      e.preventDefault()
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      setTemperature(t => Math.max(0.5, parseFloat((t - stepSmall).toFixed(2))))
+      e.preventDefault()
+    } else if (e.key === 'PageUp') {
+      setTemperature(t => Math.min(1.5, parseFloat((t + stepBig).toFixed(2))))
+      e.preventDefault()
+    } else if (e.key === 'PageDown') {
+      setTemperature(t => Math.max(0.5, parseFloat((t - stepBig).toFixed(2))))
+      e.preventDefault()
+    } else if (e.key === 'Home') {
+      setTemperature(0.5)
+      e.preventDefault()
+    } else if (e.key === 'End') {
+      setTemperature(1.5)
+      e.preventDefault()
+    }
+  }
 
   return (
     <div style={{ backgroundColor: '#0f172a', minHeight: '100vh' }}>
@@ -228,7 +303,6 @@ export default function App() {
           lineHeight: 1.6,
         }}
       >
-        {/* Full-height grid: left generator (2fr) | right detect (1.1fr) */}
         <div
           style={{
             display: 'grid',
@@ -236,38 +310,45 @@ export default function App() {
             gap: 28,
             alignItems: 'stretch',
             height: 'calc(100vh - 56px)',
-            minHeight: 0, // critical for children to be able to scroll
+            minHeight: 0,
           }}
         >
-          {/* LEFT: Generator panel */}
+          {/* LEFT: Generator */}
           <div style={{ minHeight: 0, minWidth: 0 }}>
             <div style={cardStyle}>
               {/* Response area */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  flex: 1,
-                  minHeight: 0, // allow inner flex child to take remaining space
-                }}
-              >
-                <h3 style={{ color: '#38bdf8', marginTop: 0, fontSize: 22, lineHeight: 1.3 }}>
-                  Response
-                </h3>
-                {/* Make THIS grey box the scroll container */}
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ color: '#38bdf8', marginTop: 0, fontSize: 22, lineHeight: 1.3 }}>Response</h3>
+                  <button
+                    onClick={copyResponse}
+                    style={{
+                      background: '#1e293b',
+                      color: '#38bdf8',
+                      border: '1px solid #38bdf8',
+                      borderRadius: 6,
+                      padding: '4px 8px',
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    {copyStatus}
+                  </button>
+                </div>
                 <div
                   style={{
                     ...boxStyle,
                     flex: 1,
                     minHeight: 0,
-                    overflowY: 'auto',   // vertical scroll here
+                    overflowY: 'auto',
                   }}
                 >
                   {response}
                 </div>
               </div>
 
-              {/* Prompt + Word Count */}
+              {/* Prompt + Word Count + Watermark + Temperature */}
               <div style={{ marginTop: 20, borderTop: '1px solid #475569', paddingTop: 18 }}>
                 <div
                   style={{
@@ -293,7 +374,8 @@ export default function App() {
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', gap: 14, marginTop: 10, minHeight: 0 }}>
+                {/* Inputs row */}
+                <div style={{ display: 'flex', gap: 14, minHeight: 0 }}>
                   <textarea
                     value={text}
                     onChange={(e) => setText(e.target.value)}
@@ -304,7 +386,7 @@ export default function App() {
                       flex: 1,
                       minHeight: 160,
                       maxHeight: 280,
-                      overflowY: 'auto',   // scroll inside the textarea
+                      overflowY: 'auto',
                       resize: 'vertical',
                       outline: 'none',
                       fontSize: 18,
@@ -329,6 +411,110 @@ export default function App() {
                     placeholder="Word Count"
                   />
                 </div>
+
+                {/* Watermark toggle */}
+                <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    aria-pressed={isWatermark}
+                    onClick={() => setIsWatermark(true)}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 10,
+                      border: isWatermark ? '4px solid #38bdf8' : '0.5px solid #38bdf8',
+                      cursor: 'pointer',
+                      background: '#334155',
+                      color: '#e2e8f0',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Watermark
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={!isWatermark}
+                    onClick={() => setIsWatermark(false)}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 10,
+                      border: !isWatermark ? '4px solid #38bdf8' : '0.5px solid #38bdf8',
+                      cursor: 'pointer',
+                      background: '#334155',
+                      color: '#e2e8f0',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Don’t Watermark
+                  </button>
+                </div>
+
+                {/* Temperature slider (click/drag/keyboard) */}
+                <div style={{ marginTop: 16 }}>
+                  <h3 style={{ color: '#38bdf8', margin: '0 0 8px 0', fontSize: 20, lineHeight: 1.3 }}>
+                    Model Temperature
+                  </h3>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ color: tempColor, fontWeight: 700 }}>
+                      {tempEmoji} {temperature.toFixed(2)}
+                    </div>
+                  </div>
+
+                  {/* Interactive temperature bar */}
+                  <div
+                    ref={tempBarRef}
+                    role="slider"
+                    aria-label="Model temperature"
+                    aria-valuemin={0.5}
+                    aria-valuemax={1.5}
+                    aria-valuenow={Number(temperature.toFixed(2))}
+                    tabIndex={0}
+                    onKeyDown={handleTempBarKeyDown}
+                    onMouseDown={handleTempBarMouseDown}
+                    onTouchStart={handleTempBarTouchStart}
+                    onClick={handleTempBarClick}
+                    style={{
+                      marginTop: 8,
+                      height: 16,
+                      borderRadius: 999,
+                      background: '#0b1220',
+                      border: '1px solid #1f2937',
+                      position: 'relative',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.25)',
+                    }}
+                  >
+                    {/* fill */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: `${tempToPct(temperature) * 100}%`,
+                        background: tempColor,
+                        borderRadius: 999,
+                        transition: isDraggingTempRef.current ? 'none' : 'width 120ms linear, background 120ms linear',
+                      }}
+                    />
+                    {/* knob */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: `calc(${tempToPct(temperature) * 100}% - 8px)`,
+                        transform: 'translateY(-50%)',
+                        width: 16,
+                        height: 16,
+                        borderRadius: '50%',
+                        background: '#e2e8f0',
+                        boxShadow: '0 0 0 2px ' + tempColor,
+                        pointerEvents: 'none',
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -340,19 +526,12 @@ export default function App() {
                 Detect
               </h2>
 
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  flex: 1,
-                  minHeight: 0,
-                }}
-              >
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 <textarea
                   value={detectText}
                   onChange={(e) => setDetectText(e.target.value)}
                   onKeyDown={handleDetectKeyDown}
-                  placeholder="Enter text to check for AI (Enter to detect)"
+                  placeholder="Enter text to check for AI"
                   style={{
                     ...boxStyle,
                     flex: 1,
@@ -366,7 +545,7 @@ export default function App() {
                 />
               </div>
 
-              {/* Probability Text is AI */}
+              {/* Probability Text is Watermarked */}
               <div style={{ marginTop: 16 }}>
                 <div
                   style={{
@@ -377,7 +556,7 @@ export default function App() {
                   }}
                 >
                   <h3 style={{ color: '#38bdf8', margin: 0, fontSize: 20, lineHeight: 1.3 }}>
-                    Probability Text is AI
+                    Probability Text is Watermarked
                   </h3>
                   {isDetecting && (
                     <span style={{ color: '#94a3b8', fontSize: 14 }}>{`🔄 ${detectStatusText}`}</span>
@@ -391,7 +570,7 @@ export default function App() {
                     fontWeight: 700,
                   }}
                 >
-                  {detectProb == null ? '' : `${detectProb * 100}%`}
+                  {detectProb == null ? '' : `${(detectProb * 100).toFixed(1)}%`}
                 </div>
               </div>
             </div>

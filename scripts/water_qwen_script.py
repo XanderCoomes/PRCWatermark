@@ -4,6 +4,7 @@ from configs.generation_config import GenerationConfig
 import numpy as np
 from water_editor import WaterEditor
 from pathlib import Path
+from scoring_ai import score_response
 
 
 def sparsity_function(codeword_len): 
@@ -18,11 +19,11 @@ key_dir = "keys"
 
 water_config = WaterConfig(constant_sparsity_function, encoding_noise_rate, majority_encoding_rate, key_dir)
 
-temperature = 0.7
-top_p = 0.8
+temperature = 1.1
+top_p = 1.0
 repetition_penalty = 1.2
 no_repeat_ngram_size = 3
-token_buffer = 50
+token_buffer = 0
 skip_special_tokens = True
 add_special_tokens = False
 
@@ -43,14 +44,17 @@ out_dir.mkdir(parents = True, exist_ok=True)
 editor = WaterEditor(quen, out_dir)
 
 
-prompt = "Write an essay about a historic murder"
+print("Response Generation")
+
+
+prompt = "Write an essay about Barack Obama"
 is_watermarked = True
 
 response = quen.generate(prompt, num_words, is_watermarked)
 editor.save_response(prompt, num_words, response)
 
 path_to_response = editor.get_out_path(out_dir, prompt, num_words)
-editor.edit_detect_loop(path_to_response)
+
 
 
 

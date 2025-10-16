@@ -6,8 +6,14 @@ from prc.zero_bit_prc import encode, decode
 from prc.majority_encoding import majority_encode, majority_decode
 import galois
 import sys
+import hashlib
+
+
 
 GF = galois.GF(2)
+
+
+
 
 class WaterLLM(): 
     def __init__(self, name, model, tokenizer, generation_config, water_config):
@@ -16,7 +22,7 @@ class WaterLLM():
 
         self.name = name
 
-        self._hash = self.simple_hash
+        self._hash = self.sha256_bit
 
         # Generation Config
         self.temperature = generation_config.temperature
@@ -35,13 +41,34 @@ class WaterLLM():
 
         self._key_manager = KeyManager(self.name, self.key_dir)
         self.maj_code_word = None
+
+    def set_temperature(self, temperature):
+        self.temperature = temperature
+        print(self.temperature)
+
     @staticmethod
     def simple_hash(token_id): 
         return 0 if (token_id % 2 == 0) else 1
+    @staticmethod
+    def sha256_bit(token_id: int) -> int:
+        n = max(1, (token_id.bit_length() + 7) // 8)
+        data = token_id.to_bytes(n, "little")
+        d0 = hashlib.sha256(data).digest()[0]
+        return d0 & 1
 
     def complete_prompt(self, prompt): 
         return "<|system|> You are an academic and mindful assistant. <|user|>" + prompt + "<|assistant|>"
     
+    def generate_response_with_error_rate(self, prompt, num_words, is_watermarked): 
+        pieces = []
+        it = self.generate_iter(prompt, num_words, is_watermarked)
+        try:
+            while True:
+                frag = next(it)        # stream your fragments here
+                pieces.append(frag)
+        except StopIteration as e:
+            encoding_error_rate = e.value
+            return "".join(pieces), encoding_error_rate
     def generate(self, prompt, num_words, is_watermarked):
         """
         Return the full response as a string (backwards-compatible).
@@ -54,23 +81,21 @@ class WaterLLM():
     
     def detect_water(self, text):
         token_ids = self._tokenizer.encode(text, add_special_tokens=self.add_special_tokens)
-        tokens = len(token_ids)
+        num_tokens = len(token_ids)
+        print("Tokens:", num_tokens)
+        codeword_len = self.calc_codeword_len(num_tokens)
+        current_length_prob =  self.prob_water_given_length(text, codeword_len)
+        half_length_prob = self.prob_water_given_length(text, int(codeword_len / 2))
+        double_length_prob = self.prob_water_given_length(text, codeword_len * 2)
 
-        watermarked_prob = 0.0
-        codeword_len = 16
-
-        # Only consider codeword_len where we can actually fill all majority groups
-        while codeword_len * self.majority_encoding_rate <= tokens:
-            prob = self.detect_water_given_length(text, codeword_len)
-            watermarked_prob = max(watermarked_prob, prob)
-            codeword_len *= 2
-
-        return watermarked_prob
+        return max(current_length_prob, half_length_prob, double_length_prob)
 
 
-    def detect_water_given_length(self, text, codeword_len): 
+    def prob_water_given_length(self, text, codeword_len): 
         majority_codeword_len = codeword_len * self.majority_encoding_rate
         token_ids = self._tokenizer.encode(text, add_special_tokens = self.add_special_tokens)
+        if(majority_codeword_len > len(token_ids)): 
+            return 0 
         noisy_majority_codeword = np.empty(0, dtype = int)
         for tid in token_ids[0 : majority_codeword_len]:
             h = self.simple_hash(tid)
@@ -80,15 +105,15 @@ class WaterLLM():
 
         key = self._key_manager.fetch_key(codeword_len, sparsity)
         if(key is not None): 
-            generator_matrix, parity_check_matrix, one_time_pad = key
+            generator_matrix, parity_check_matrix, one_time_pad, permutation = key
         else: 
-            generator_matrix, parity_check_matrix, one_time_pad = self._key_manager.gen_key(codeword_len, sparsity)
+            generator_matrix, parity_check_matrix, one_time_pad, permutation = self._key_manager.gen_key(codeword_len, sparsity)
      
     
-        decoding_key = (parity_check_matrix, one_time_pad)
-        # if(self.maj_code_word is not None): 
-        #     decoding_error_rate = np.sum((GF(noisy_majority_codeword) + GF(self.maj_code_word)) == 1) / len(self.maj_code_word)
-        #     print("Decoding Error Rate:", decoding_error_rate)
+        decoding_key = (parity_check_matrix, one_time_pad, permutation)
+        if(self.maj_code_word is not None and len(self.maj_code_word) == len(noisy_majority_codeword)): 
+            decoding_error_rate = np.sum((GF(noisy_majority_codeword) + GF(self.maj_code_word)) == 1) / len(self.maj_code_word)
+            print("Decoding Error Rate:", decoding_error_rate)
         noisy_codeword = majority_decode(noisy_majority_codeword, codeword_len)
         return decode(decoding_key, noisy_codeword, sparsity)
     
@@ -104,7 +129,6 @@ class WaterLLM():
     def calc_codeword_len(self, num_tokens): 
         nearest_pow = self._nearest_pow2(int(num_tokens / self.majority_encoding_rate))
         return nearest_pow
-
         
 
     def __gen_codeword(self, num_tokens):
@@ -112,10 +136,10 @@ class WaterLLM():
         sparsity = self.sparsity_function(codeword_len)
         key = self._key_manager.fetch_key(codeword_len, self.sparsity_function(codeword_len))
         if(key is not None): 
-            generator_matrix, parity_check_matrix, one_time_pad = key
+            generator_matrix, parity_check_matrix, one_time_pad, permutation = key
         else: 
-            generator_matrix, parity_check_matrix, one_time_pad = self._key_manager.gen_key(codeword_len, sparsity)
-        encoding_key = (generator_matrix, one_time_pad)
+            generator_matrix, parity_check_matrix, one_time_pad, permutation = self._key_manager.gen_key(codeword_len, sparsity)
+        encoding_key = (generator_matrix, one_time_pad, permutation)
         codeword = encode(encoding_key, self.encoding_noise_rate)
         majority_codeword = majority_encode(codeword, self.majority_encoding_rate)
         self.maj_code_word = majority_codeword
@@ -161,9 +185,17 @@ class WaterLLM():
         
         group_probs = probs[0][bits_to_boost]
         unbiased_bit_prob = group_probs.sum().item()
+        sentence = ""; 
+       
+        if unbiased_bit_prob > 0.25 and unbiased_bit_prob < 0.85: 
+            sentence = " HIGH ENTROPY"
+
+        print("  Unbiased_bit_prob: ", unbiased_bit_prob, sentence)
 
         if unbiased_bit_prob == 0.0 or unbiased_bit_prob == 1.0:
             return probs
+        
+       
 
         biased_bit_prob = 1.0 if unbiased_bit_prob > 0.5 else 2 * unbiased_bit_prob
 
@@ -263,6 +295,11 @@ class WaterLLM():
                 # Optional end condition
                 if frag in ending_tokens and t > len(codeword):
                     break
-        print()
-        print("Encoding Error Rate:", encoding_errors / len(codeword))
-        print()  # newline at end of generation
+        # print()
+        encoding_error_rate = encoding_errors / len(codeword)
+        # print("Codeword Length: ", len(codeword))
+        # print("Encoding Errors: ", encoding_errors)
+        # print("Encoding Error Rate:", encoding_error_rate)
+        return encoding_error_rate
+    
+        # print()  # newline at end of generation

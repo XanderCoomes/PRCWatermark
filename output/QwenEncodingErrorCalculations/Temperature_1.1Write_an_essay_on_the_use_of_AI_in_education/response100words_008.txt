@@ -1,0 +1,7 @@
+ **The Use of Artificial Intelligence in Education: Opportunities, Challenges, and Ethical Considerations**
+
+Artificial intelligence (AI) is rapidly transforming various sectors worldwide, with education emerging as one of its most promising frontiers. From personalized learning pathways to automated grading systems, AI technologies offer unprecedented opportunities for enhancing teaching methodologies, improving student outcomes, and making educational access more equitable. However, this integration also raises critical ethical, pedagogical, and societal questions that must be addressed carefully.
+
+### The Transformative Potential of AI
+
+At its core, artificial intelligence refers to machines designed to simulate human cognitive functions such as problem-solving, pattern recognition, decision

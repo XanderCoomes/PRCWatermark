@@ -1,0 +1,4 @@
+Title: The Use of Artificial Intelligence in Education
+
+Introduction  
+Artificial intelligence (AI) is rapidly transforming various sectors, including healthcare, finance, transportation, and notably—education. As technology advances at a dizzying pace, educational institutions worldwide are beginning to integrate artificial intelligence into their curricula and administrative processes. From personalized learning pathways to automated grading systems, AI promises both efficiency and equity in teaching methods. However, as with any transformative innovation, its adoption raises critical questions about ethics, privacy, access, and long-term impact on pedagogy. This paper explores the multifaceted role of AI within education—from benefits such as adaptive learning

@@ -1,0 +1,7 @@
+ doing left justified, with every line closed with a period<|end_inst|>
+
+The integration of artificial intelligence into education is transforming traditional learning models and redefining how knowledge is delivered and accessed  
+Artificial intelligence offers personalized learning pathways that adapt to individual students' needs based on their performance data and pace of understanding  
+One major benefit of AI-powered tools is their ability to provide instant feedback, allowing learners to correct mistakes immediately rather than waiting for teacher assessments  
+Intelligent tutoring systems simulate human guidance by recognizing patterns in student behavior and offering targeted questions or explanations when necessary  
+AI also enables scalable assessment solutions where machine grading handles large volumes of responses

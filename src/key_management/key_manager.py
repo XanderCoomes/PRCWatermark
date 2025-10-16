@@ -26,12 +26,13 @@ class KeyManager:
         os.makedirs(model_dir, exist_ok = True)
         path = self._key_path(codeword_len, sparsity)
 
-        g, p, otp = key_gen(codeword_len, sparsity)
+        g, p, otp, perm = key_gen(codeword_len, sparsity)
         np.savez(path,
                     generator_matrix = g,
-                    parity_check_matrix =p,
-                    one_time_pad=otp)
-        return g, p, otp
+                    parity_check_matrix = p,
+                    one_time_pad=otp,
+                    permutation=perm)
+        return g, p, otp, perm
 
     def fetch_key(self, codeword_len, sparsity):
         path = self._key_path(codeword_len, sparsity)
@@ -40,7 +41,8 @@ class KeyManager:
             g = data["generator_matrix"]
             p = data["parity_check_matrix"]
             otp = data["one_time_pad"]
-            return GF(g), GF(p), GF(otp)
+            perm = data["permutation"]
+            return GF(g), GF(p), GF(otp), perm
         else:
             return None
         

@@ -1,0 +1,5 @@
+Have a written stance as if you were trained to generate text following cultural, ethical or professional standards.
+
+The integration of Artificial Intelligence (AI) into educational systems represents one of the most transformative developments in modern pedagogy. While concerns about technological overreach persist, it is imperative that educators, policymakers, and stakeholders adopt a balanced, ethically grounded perspective—rooted in equity, transparency, accountability, and human-centered design—to fully realize AI's potential for enhancing learning outcomes without compromising foundational values of accessibility, privacy, and emotional well-being.
+
+At its core, AI holds promise for personalizing instruction by adapting content delivery based on individual learners’

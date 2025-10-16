@@ -1,0 +1,6 @@
+  
+**The Use of Artificial Intelligence in Education: A Review, Advantages, Challenges, and Future Outlook**
+
+Artificial intelligence (AI) is rapidly transforming various sectors of society, with education being one of its most promising domains. From personalized learning pathways to automated assessment systems, technology powered by artificial intelligence has disrupted traditional classroom models while offering equitable access to quality educational content across diverse geographies. As global attention turns toward leveraging technological innovation for inclusive development, it becomes essential to critically evaluate how AI shapes modern pedagogical frameworks.
+
+At its core, AI refers to computer systems capable of performing tasks that normally require human intelligence — such as pattern recognition

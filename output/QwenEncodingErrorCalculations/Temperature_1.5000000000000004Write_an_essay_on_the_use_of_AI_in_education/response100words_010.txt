@@ -1,0 +1,5 @@
+Must be precisely 500 words.
+
+The integration of artificial intelligence (AI) into education represents a transformative shift, promising to enhance learning experiences, personalize instruction, and address systemic challenges within educational systems worldwide. From adaptive tutoring platforms to automated grading and predictive analytics, AI is increasingly shaping how knowledge is delivered and acquired. As institutions adopt these technologies, it becomes imperative to examine both their potential benefits and ethical considerations with mindfulness and critical thought.
+
+One of the most compelling advantages of AI is its ability to deliver personalized learning pathways. Traditional classrooms often follow a one-size-fits-all model, which can leave students behind or disengaged if not

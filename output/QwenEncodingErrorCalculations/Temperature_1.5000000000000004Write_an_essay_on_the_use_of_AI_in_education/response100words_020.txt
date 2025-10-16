@@ -1,0 +1,5 @@
+The Use of Artificial Intelligence (AI) in Education
+
+Artificial intelligence has long been a subject of fascination for technologists, scientists, and educators alike. Over recent years, there is growing interest within educational institutions to explore how artificial intelligence can be harnessed not only as a tool but also as a transformative force reshaping pedagogy and learning experiences. From automated grading systems to personalized tutoring platforms, this new frontier offers solutions that could help make education more equitable, efficient, and accessible.
+
+At its core, AI in EdTech functions by leveraging algorithms capable of recognizing patterns from large datasets—such as student behavior or performance metrics—and generating

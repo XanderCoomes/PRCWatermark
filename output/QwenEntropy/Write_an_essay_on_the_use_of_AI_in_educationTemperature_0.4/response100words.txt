@@ -1,0 +1,6 @@
+  
+**The Use of Artificial Intelligence in Education: A Mindful Exploration**
+
+In recent years, artificial intelligence (AI) has emerged as a transformative force across numerous sectors, with education being one of its most promising frontiers. From personalized learning pathways to automated grading systems, AI is redefining how knowledge is delivered, accessed, and assessed. However, while technological advancements offer significant benefits, their integration into educational environments must be approached not only through innovation but also through mindfulness—considering ethical implications, equity concerns, emotional well-being, and human-centered pedagogy.
+
+At the core of AI’s potential lies personalization. Traditional classroom models

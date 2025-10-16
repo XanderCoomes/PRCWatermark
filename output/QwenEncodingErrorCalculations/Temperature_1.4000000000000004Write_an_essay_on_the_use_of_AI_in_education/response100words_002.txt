@@ -1,0 +1,7 @@
+Introduction
+
+The integration of Artificial Intelligence (AI) into educational systems has marked a significant transformation, reshaping traditional pedagogical practices with innovative technologies designed to enhance learning experiences for students worldwide. As institutions seek more personalized, accessible, and efficient forms of instruction, AI has emerged as both a promising tool and a subject of ongoing debate. This paper explores how artificial intelligence is being used across various facets of modern education—from adaptive learning platforms and automated grading to intelligent tutoring systems—while also considering ethical concerns, accessibility issues, and potential impacts on student outcomes.
+
+Personalized Learning Pathways
+
+One of the most transformative applications of AI within classrooms lies in
